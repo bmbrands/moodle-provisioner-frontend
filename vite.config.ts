@@ -10,5 +10,11 @@ export default defineConfig({
     port: 5173,
     strictPort: true,     // fail if 5173 is taken instead of silently choosing another
     open: true,           // auto-open in your browser
+    proxy: {
+      "/api": {
+        target: "http://localhost:8000",
+        changeOrigin: true,
+      },
+    },
   },
 });

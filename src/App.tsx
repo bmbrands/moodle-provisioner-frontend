@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo } from "react";
+import { useState, useRef, useMemo, useEffect } from "react";
 import { Plus } from "lucide-react";
 import { Button } from "./components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./components/ui/card";
@@ -26,6 +26,7 @@ import type { User } from "./types/user";
 import { mockPlugins, mockPluginVersions } from "./types/plugin";
 import type { Plugin } from "./types/plugin";
 import { toast } from "sonner";
+import { fetchInfrastructures } from "./services/api";
 
 const generateDetailedEnvironment = (env: Environment): DetailedEnvironment => ({
   ...env,
@@ -289,10 +290,11 @@ const mockEnvironments: Environment[] = [
 export default function App() {
   const auth = useAuth();
   const auditLog = useAuditLog();
-  const [environments, setEnvironments] = useState<Environment[]>(mockEnvironments);
+  const [environments, setEnvironments] = useState<Environment[]>([]);
   const [users, setUsers] = useState<User[]>(mockUsers);
   const [plugins, setPlugins] = useState<Plugin[]>(mockPlugins);
   const [filters, setFilters] = useState<EnvironmentFilters>(defaultFilters);
+  const [isLoading, setIsLoading] = useState(true);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isAddContainerModalOpen, setIsAddContainerModalOpen] = useState(false);
   const [addContainerEnvironment, setAddContainerEnvironment] = useState<Environment | null>(null);
@@ -309,6 +311,20 @@ export default function App() {
   const [isTimelineModalOpen, setIsTimelineModalOpen] = useState(false);
   const [activeTimelines, setActiveTimelines] = useState<Map<string, ProvisioningTimeline>>(new Map());
   const timelineRefs = useRef<Map<string, NodeJS.Timeout>>(new Map());
+
+  // Fetch real infrastructure data from the API
+  useEffect(() => {
+    fetchInfrastructures()
+      .then((envs) => {
+        setEnvironments(envs);
+        setIsLoading(false);
+      })
+      .catch((err) => {
+        console.error("Failed to fetch infrastructures:", err);
+        toast.error("Failed to load environments from API");
+        setIsLoading(false);
+      });
+  }, []);
 
   // Apply filters to get filtered environments
   const filteredEnvironments = useMemo(() => {
@@ -1239,6 +1255,11 @@ export default function App() {
             </div>
           </CardHeader>
           <CardContent className="p-6 pt-0 pb-0">
+            {isLoading ? (
+              <div className="flex items-center justify-center py-12 text-muted-foreground">
+                Loading environments from API…
+              </div>
+            ) : (
             <EnvironmentsTable
               environments={filteredEnvironments}
               plugins={plugins}
@@ -1252,6 +1273,7 @@ export default function App() {
               onContainerDetails={handleContainerDetails}
               onViewTimeline={handleViewTimeline}
             />
+            )}
           </CardContent>
         </Card>
 
