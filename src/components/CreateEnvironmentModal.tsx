@@ -19,6 +19,7 @@ interface CreateEnvironmentModalProps {
     name: string;
     plugin: string;
     version: string;
+    versionType: "branch" | "tag" | "pr" | "commit";
     moodleVersions: string[];
     advancedConfig?: {
       additionalPlugins: string[];
@@ -185,10 +186,13 @@ export function CreateEnvironmentModal({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (name && selectedPluginId && version && moodleVersions.length > 0 && selectedPlugin) {
+      const selectedVersion = availableVersions.find(v => v.ref === version);
+      const versionType = selectedVersion?.type ?? "branch";
       const environment = {
         name,
         plugin: selectedPlugin.name, // Use the plugin technical name
         version,
+        versionType,
         moodleVersions,
         ...(showAdvanced && {
           advancedConfig: {

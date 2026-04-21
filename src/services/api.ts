@@ -74,6 +74,33 @@ export async function fetchInfrastructures(): Promise<Environment[]> {
   return data.infrastructures.map(mapInfrastructureToEnvironment);
 }
 
+export interface CreateInfrastructurePayload {
+  name: string;
+  git_ref_type: "branch" | "tag" | "commit" | "pr";
+  git_ref: string;
+  moodle_versions: string[];
+}
+
+export async function createInfrastructure(
+  payload: CreateInfrastructurePayload
+): Promise<void> {
+  const response = await fetch("/api/infrastructures", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    let detail = await response.text();
+    try {
+      const parsed = JSON.parse(detail);
+      if (parsed && parsed.detail) detail = parsed.detail;
+    } catch {
+      // detail remains as the raw text
+    }
+    throw new Error(`Failed to create infrastructure: ${response.status} ${detail}`);
+  }
+}
+
 export async function startContainer(
   infrastructureName: string,
   moodleVersion: string

@@ -26,7 +26,7 @@ import type { User } from "./types/user";
 import { mockPluginVersions } from "./types/plugin";
 import type { Plugin } from "./types/plugin";
 import { toast } from "sonner";
-import { fetchInfrastructures, startContainer as apiStartContainer, stopContainer as apiStopContainer, deleteContainer as apiDeleteContainer, deleteInfrastructure as apiDeleteInfrastructure, fetchPlugins as apiFetchPlugins, createPlugin as apiCreatePlugin, updatePlugin as apiUpdatePlugin, deletePlugin as apiDeletePlugin } from "./services/api";
+import { fetchInfrastructures, startContainer as apiStartContainer, stopContainer as apiStopContainer, deleteContainer as apiDeleteContainer, deleteInfrastructure as apiDeleteInfrastructure, fetchPlugins as apiFetchPlugins, createPlugin as apiCreatePlugin, updatePlugin as apiUpdatePlugin, deletePlugin as apiDeletePlugin, createInfrastructure as apiCreateInfrastructure } from "./services/api";
 
 const generateDetailedEnvironment = (env: Environment): DetailedEnvironment => ({
   ...env,
@@ -479,91 +479,67 @@ export default function App() {
     timelineRefs.current.set(`${environmentId}-${stepIndex}`, timeout);
   };
 
-  const handleCreateEnvironment = (newEnv: {
+  const handleCreateEnvironment = async (newEnv: {
     name: string;
     plugin: string;
     version: string;
+    versionType: "branch" | "tag" | "pr" | "commit";
     moodleVersions: string[];
     advancedConfig?: {
-      database: string;
-      phpVersion: string;
-      enableMLBackend: boolean;
       additionalPlugins: string[];
     };
   }) => {
-    // Create containers for each selected Moodle version
-    const containers: MoodleContainer[] = newEnv.moodleVersions.map((moodleVersion, index) => ({
-      id: `container-${Date.now()}-${index}`,
-      moodleVersion,
-      status: "provisioning" as const,
-      url: `https://focused-cray.92-205-184-244.plesk.page/${newEnv.name}${moodleVersion.replace(/\./g, '-')}/`,
-      adminPassword: generatePassword(),
-      createdAt: "Just now",
-      ...(newEnv.advancedConfig && {
-        advancedConfig: newEnv.advancedConfig
-      })
-    }));
+    const containerText = newEnv.moodleVersions.length === 1 ? "container" : "containers";
+    const toastId = toast.loading(
+      `Creating "${newEnv.name}" with ${newEnv.moodleVersions.length} ${containerText}… this can take a few minutes.`
+    );
 
-    const environment: Environment = {
-      id: `env-${Date.now()}`,
-      name: newEnv.name,
-      plugin: newEnv.plugin,
-      version: newEnv.version,
-      createdAt: "Just now",
-      isPinned: false,
-      isWebhookCreated: false,
-      containers,
-      createdBy: auth.currentUser ? {
-        id: auth.currentUser.id,
-        name: `${auth.currentUser.firstName} ${auth.currentUser.lastName}`,
-        email: auth.currentUser.email
-      } : undefined
-    };
+    try {
+      await apiCreateInfrastructure({
+        name: newEnv.name,
+        git_ref_type: newEnv.versionType,
+        git_ref: newEnv.version,
+        moodle_versions: newEnv.moodleVersions,
+      });
 
-    setEnvironments(prev => [environment, ...prev]);
+      // Reload the authoritative list from the backend so ports, URLs and
+      // generated admin passwords reflect what actually got created.
+      const envs = await fetchInfrastructures();
+      setEnvironments(envs);
 
-    // Log the activity
-    if (auth.currentUser) {
-      auditLog.logActivity(
-        auth.currentUser.id,
-        `${auth.currentUser.firstName} ${auth.currentUser.lastName}`,
-        auth.currentUser.email,
-        'create',
-        'environment',
-        {
-          plugin: newEnv.plugin,
-          version: newEnv.version,
-          moodleVersions: newEnv.moodleVersions,
-          containersCreated: containers.length,
-          ...(newEnv.advancedConfig && {
-            advancedConfig: {
-              database: newEnv.advancedConfig.database,
-              phpVersion: newEnv.advancedConfig.phpVersion,
-              enableMLBackend: newEnv.advancedConfig.enableMLBackend,
-              additionalPluginsCount: newEnv.advancedConfig.additionalPlugins.length,
-              additionalPlugins: newEnv.advancedConfig.additionalPlugins
-            }
-          })
-        },
-        environment.id,
-        newEnv.name
+      // Log the activity
+      if (auth.currentUser) {
+        auditLog.logActivity(
+          auth.currentUser.id,
+          `${auth.currentUser.firstName} ${auth.currentUser.lastName}`,
+          auth.currentUser.email,
+          'create',
+          'environment',
+          {
+            plugin: newEnv.plugin,
+            version: newEnv.version,
+            versionType: newEnv.versionType,
+            moodleVersions: newEnv.moodleVersions,
+            ...(newEnv.advancedConfig && {
+              advancedConfig: {
+                additionalPluginsCount: newEnv.advancedConfig.additionalPlugins.length,
+                additionalPlugins: newEnv.advancedConfig.additionalPlugins,
+              }
+            })
+          },
+          newEnv.name,
+          newEnv.name
+        );
+      }
+
+      toast.success(
+        `Environment "${newEnv.name}" with ${newEnv.moodleVersions.length} ${containerText} created!`,
+        { id: toastId }
       );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      toast.error(`Failed to create "${newEnv.name}": ${message}`, { id: toastId });
     }
-
-    // Create and start provisioning timeline for each container
-    containers.forEach(container => {
-      const timeline = createProvisioningTimeline(environment);
-      setActiveTimelines(prev => new Map(prev.set(container.id, timeline)));
-      // Start the provisioning simulation for each container
-      simulateProvisioningStep(container.id, 0);
-    });
-
-    const configDetails = newEnv.advancedConfig
-      ? ` with ${newEnv.advancedConfig.database} database, PHP ${newEnv.advancedConfig.phpVersion}${newEnv.advancedConfig.enableMLBackend ? ', MLBackend enabled' : ''}${newEnv.advancedConfig.additionalPlugins.length > 0 ? `, +${newEnv.advancedConfig.additionalPlugins.length} additional plugins` : ''}`
-      : '';
-
-    const containerText = containers.length === 1 ? 'container' : 'containers';
-    toast.success(`Environment "${newEnv.name}" with ${containers.length} ${containerText} provisioning started${configDetails}!`);
   };
 
   const generatePassword = () => {
@@ -871,11 +847,9 @@ export default function App() {
     name: string;
     plugin: string;
     version: string;
+    versionType: "branch" | "tag" | "pr" | "commit";
     moodleVersions: string[];
     advancedConfig?: {
-      database: string;
-      phpVersion: string;
-      enableMLBackend: boolean;
       additionalPlugins: string[];
     };
   }) => {
@@ -888,7 +862,6 @@ export default function App() {
       url: `https://focused-cray.92-205-184-244.plesk.page/${addContainerEnvironment.name}/${moodleVersion.replace(/\./g, '-')}/`,
       adminPassword: generatePassword(),
       createdAt: "Just now",
-      ...(containerData.advancedConfig && { advancedConfig: containerData.advancedConfig })
     }));
 
     setEnvironments(prev =>
@@ -923,11 +896,8 @@ export default function App() {
           containersAdded: newContainers.length,
           ...(containerData.advancedConfig && {
             advancedConfig: {
-              database: containerData.advancedConfig.database,
-              phpVersion: containerData.advancedConfig.phpVersion,
-              enableMLBackend: containerData.advancedConfig.enableMLBackend,
               additionalPluginsCount: containerData.advancedConfig.additionalPlugins.length,
-              additionalPlugins: containerData.advancedConfig.additionalPlugins
+              additionalPlugins: containerData.advancedConfig.additionalPlugins,
             }
           })
         },
