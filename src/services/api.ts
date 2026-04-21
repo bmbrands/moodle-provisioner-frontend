@@ -204,3 +204,25 @@ export async function deletePlugin(pluginId: string): Promise<void> {
     throw new Error(`Failed to delete plugin: ${response.status} ${detail}`);
   }
 }
+
+export interface MoodleVersion {
+  version: string;
+  tag: string;
+  major: number;
+  minor: number;
+  patch: number;
+}
+
+interface ApiMoodleVersionsResponse {
+  versions: MoodleVersion[];
+}
+
+export async function fetchMoodleVersions(): Promise<MoodleVersion[]> {
+  const response = await fetch("/api/moodle/versions");
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`Failed to fetch Moodle versions: ${response.status} ${detail}`);
+  }
+  const data: ApiMoodleVersionsResponse = await response.json();
+  return data.versions;
+}

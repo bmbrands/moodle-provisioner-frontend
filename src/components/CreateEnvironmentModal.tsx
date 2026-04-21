@@ -8,9 +8,9 @@ import { Badge } from "./ui/badge";
 import { Checkbox } from "./ui/checkbox";
 import { Textarea } from "./ui/textarea";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "./ui/collapsible";
-import { ChevronDown, ChevronRight, Plus, X, Database, Cpu, Network } from "lucide-react";
+import { ChevronDown, ChevronRight, Plus, X } from "lucide-react";
 import type { Plugin, PluginVersion } from "../types/plugin";
-import { fetchPluginVersions } from "../services/api";
+import { fetchPluginVersions, fetchMoodleVersions } from "../services/api";
 
 interface CreateEnvironmentModalProps {
   open: boolean;
@@ -21,9 +21,6 @@ interface CreateEnvironmentModalProps {
     version: string;
     moodleVersions: string[];
     advancedConfig?: {
-      database: string;
-      phpVersion: string;
-      enableMLBackend: boolean;
       additionalPlugins: string[];
     };
   }) => void;
@@ -38,7 +35,7 @@ interface CreateEnvironmentModalProps {
   };
 }
 
-const availableMoodleVersions = [
+const availableMoodleVersionsFallback = [
   "5.0.2",
   "5.0.1",
   "5.0.0",
@@ -49,21 +46,6 @@ const availableMoodleVersions = [
   "4.3.0",
   "4.2.0",
   "4.1.0",
-];
-
-const databaseOptions = [
-  { value: "mariadb10.11", label: "MySQL 8.0" },
-  { value: "mysql5.7", label: "MySQL 5.7" },
-  { value: "mariadb10.11", label: "MariaDB 10.11" },
-  { value: "postgres15", label: "PostgreSQL 15" },
-  { value: "postgres14", label: "PostgreSQL 14" }
-];
-
-const phpVersions = [
-  { value: "8.2", label: "PHP 8.2" },
-  { value: "8.1", label: "PHP 8.1" },
-  { value: "8.0", label: "PHP 8.0" },
-  { value: "7.4", label: "PHP 7.4" }
 ];
 
 export function CreateEnvironmentModal({
@@ -87,11 +69,37 @@ export function CreateEnvironmentModal({
 
   // Advanced settings state
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [database, setDatabase] = useState("mysql");
-  const [phpVersion, setPhpVersion] = useState("8.2");
-  const [enableMLBackend, setEnableMLBackend] = useState(false);
   const [additionalPlugins, setAdditionalPlugins] = useState<string[]>([]);
   const [newPluginInput, setNewPluginInput] = useState("");
+
+  // Available Moodle versions, fetched live from the backend (which pulls
+  // them from tags on moodle/moodle) with a static fallback.
+  const [availableMoodleVersions, setAvailableMoodleVersions] = useState<string[]>(
+    availableMoodleVersionsFallback
+  );
+  const [moodleVersionsLoading, setMoodleVersionsLoading] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    setMoodleVersionsLoading(true);
+    fetchMoodleVersions()
+      .then((versions) => {
+        if (cancelled) return;
+        if (versions.length > 0) {
+          setAvailableMoodleVersions(versions.map(v => v.version));
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to fetch Moodle versions:", err);
+      })
+      .finally(() => {
+        if (!cancelled) setMoodleVersionsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
 
   // Get only active plugins for selection
   const activePlugins = useMemo(() =>
@@ -184,9 +192,6 @@ export function CreateEnvironmentModal({
         moodleVersions,
         ...(showAdvanced && {
           advancedConfig: {
-            database,
-            phpVersion,
-            enableMLBackend,
             additionalPlugins
           }
         })
@@ -200,9 +205,6 @@ export function CreateEnvironmentModal({
       setVersion("");
       setMoodleVersions([]);
       setShowAdvanced(false);
-      setDatabase("mysql");
-      setPhpVersion("8.2");
-      setEnableMLBackend(false);
       setAdditionalPlugins([]);
       setNewPluginInput("");
       onOpenChange(false);
@@ -395,7 +397,7 @@ export function CreateEnvironmentModal({
                 required
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select Moodle version" />
+                  <SelectValue placeholder={moodleVersionsLoading ? "Loading Moodle versions…" : "Select Moodle version"} />
                 </SelectTrigger>
                 <SelectContent>
                   {availableMoodleVersions.map((mv) => (
@@ -434,71 +436,10 @@ export function CreateEnvironmentModal({
             </div>
 
             <CollapsibleContent className="space-y-6 pt-4 border-t">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Database Selection */}
-                <div className="space-y-2">
-                  <Label htmlFor="database-select" className="flex items-center gap-2">
-                    <Database className="h-4 w-4" />
-                    Database Engine
-                  </Label>
-                  <Select value={database} onValueChange={setDatabase}>
-                    <SelectTrigger id="database-select">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {databaseOptions.map((db) => (
-                        <SelectItem key={db.value} value={db.value}>
-                          {db.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* PHP Version Selection */}
-                <div className="space-y-2">
-                  <Label htmlFor="php-version-select" className="flex items-center gap-2">
-                    <Cpu className="h-4 w-4" />
-                    PHP Version
-                  </Label>
-                  <Select value={phpVersion} onValueChange={setPhpVersion}>
-                    <SelectTrigger id="php-version-select">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {phpVersions.map((php) => (
-                        <SelectItem key={php.value} value={php.value}>
-                          {php.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              {/* MLBackend Integration */}
-              <div className="space-y-3">
-                <Label className="flex items-center gap-2">
-                  <Network className="h-4 w-4" />
-                  Machine Learning Backend
-                </Label>
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="ml-backend"
-                    checked={enableMLBackend}
-                    onCheckedChange={setEnableMLBackend}
-                  />
-                  <Label
-                    htmlFor="ml-backend"
-                    className="text-sm font-normal cursor-pointer"
-                  >
-                    Enable MLBackend integration and network mapping
-                  </Label>
-                </div>
-                <p className="text-xs text-muted-foreground ml-6">
-                  Includes machine learning services for recommendation engines, analytics, and AI features
-                </p>
-              </div>
+              {/* Database Engine and PHP Version selectors are hidden for now:
+                  the backend picks DB/PHP automatically based on the Moodle
+                  version (see moodle-versions-to-supported-php-versions.yaml).
+                  Re-enable once the backend accepts overrides. */}
 
               {/* Additional Plugins */}
               <div className="space-y-3">
