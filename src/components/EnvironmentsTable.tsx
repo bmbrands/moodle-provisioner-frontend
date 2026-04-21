@@ -95,6 +95,7 @@ interface EnvironmentsTableProps {
   pluginVersions: Record<string, PluginVersion[]>;
   onStartContainer: (environmentId: string, containerId: string) => void;
   onStopContainer: (environmentId: string, containerId: string) => void;
+  onDeleteContainer: (environmentId: string, containerId: string) => void;
   onDeleteEnvironment: (id: string) => void;
   onAddContainer: (environmentId: string, moodleVersions: string[], advancedConfig?: any) => void;
   onRowClick: (environment: Environment) => void;
@@ -109,6 +110,7 @@ export function EnvironmentsTable({
   pluginVersions,
   onStartContainer,
   onStopContainer,
+  onDeleteContainer,
   onDeleteEnvironment,
   onAddContainer,
   onRowClick,
@@ -367,6 +369,12 @@ export function EnvironmentsTable({
                                 </div>
                               )}
                               <div className="mt-1 flex flex-col gap-1">
+                                {container.createdAt && (
+                                  <div className="flex items-center gap-1 text-sm">
+                                    <span className="text-muted-foreground">Created:</span>
+                                    <span className="text-muted-foreground">{container.createdAt}</span>
+                                  </div>
+                                )}
                                 <div className="flex items-center gap-1 text-sm">
                                   <span className="text-muted-foreground">URL:</span>
                                   <a
@@ -461,8 +469,7 @@ export function EnvironmentsTable({
                                   className="text-destructive focus:bg-destructive focus:text-destructive-foreground"
                                   onClick={(e: React.MouseEvent) => {
                                     e.stopPropagation();
-                                    // TODO: Implement container deletion
-                                    toast.error("Container deletion not yet implemented");
+                                    onDeleteContainer(env.id, container.id);
                                   }}
                                 >
                                   <Trash2 className="h-4 w-4 mr-2" />

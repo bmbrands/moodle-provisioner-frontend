@@ -26,7 +26,7 @@ import type { User } from "./types/user";
 import { mockPlugins, mockPluginVersions } from "./types/plugin";
 import type { Plugin } from "./types/plugin";
 import { toast } from "sonner";
-import { fetchInfrastructures } from "./services/api";
+import { fetchInfrastructures, startContainer as apiStartContainer, stopContainer as apiStopContainer, deleteContainer as apiDeleteContainer, deleteInfrastructure as apiDeleteInfrastructure } from "./services/api";
 
 const generateDetailedEnvironment = (env: Environment): DetailedEnvironment => ({
   ...env,
@@ -619,6 +619,8 @@ export default function App() {
     const env = environments.find(e => e.id === environmentId);
     const container = env?.containers.find(c => c.id === containerId);
 
+    if (!env || !container) return;
+
     setEnvironments(prev =>
       prev.map(environment =>
         environment.id === environmentId
@@ -652,29 +654,50 @@ export default function App() {
       );
     }
 
-    // Simulate startup
-    setTimeout(() => {
-      setEnvironments(prev =>
-        prev.map(environment =>
-          environment.id === environmentId
-            ? {
-                ...environment,
-                containers: environment.containers.map(container =>
-                  container.id === containerId
-                    ? { ...container, status: "running" as const }
-                    : container
-                )
-              }
-            : environment
-        )
-      );
-      toast.success(`Container Moodle ${container?.moodleVersion} started successfully!`);
-    }, 2000);
+    // Call the backend API to start the container
+    apiStartContainer(env.name, container.moodleVersion)
+      .then(() => {
+        setEnvironments(prev =>
+          prev.map(environment =>
+            environment.id === environmentId
+              ? {
+                  ...environment,
+                  containers: environment.containers.map(c =>
+                    c.id === containerId
+                      ? { ...c, status: "running" as const }
+                      : c
+                  )
+                }
+              : environment
+          )
+        );
+        toast.success(`Container Moodle ${container.moodleVersion} started successfully!`);
+      })
+      .catch((err) => {
+        console.error("Failed to start container:", err);
+        setEnvironments(prev =>
+          prev.map(environment =>
+            environment.id === environmentId
+              ? {
+                  ...environment,
+                  containers: environment.containers.map(c =>
+                    c.id === containerId
+                      ? { ...c, status: "stopped" as const }
+                      : c
+                  )
+                }
+              : environment
+          )
+        );
+        toast.error(`Failed to start container Moodle ${container.moodleVersion}`);
+      });
   };
 
   const handleStopContainer = (environmentId: string, containerId: string) => {
     const env = environments.find(e => e.id === environmentId);
     const container = env?.containers.find(c => c.id === containerId);
+
+    if (!env || !container) return;
 
     setEnvironments(prev =>
       prev.map(environment =>
@@ -709,24 +732,120 @@ export default function App() {
       );
     }
 
-    // Simulate shutdown
-    setTimeout(() => {
-      setEnvironments(prev =>
-        prev.map(environment =>
-          environment.id === environmentId
-            ? {
-                ...environment,
-                containers: environment.containers.map(container =>
-                  container.id === containerId
-                    ? { ...container, status: "stopped" as const }
-                    : container
-                )
-              }
-            : environment
-        )
+    // Call the backend API to stop the container
+    apiStopContainer(env.name, container.moodleVersion)
+      .then(() => {
+        setEnvironments(prev =>
+          prev.map(environment =>
+            environment.id === environmentId
+              ? {
+                  ...environment,
+                  containers: environment.containers.map(c =>
+                    c.id === containerId
+                      ? { ...c, status: "stopped" as const }
+                      : c
+                  )
+                }
+              : environment
+          )
+        );
+        toast.success(`Container Moodle ${container.moodleVersion} stopped successfully!`);
+      })
+      .catch((err) => {
+        console.error("Failed to stop container:", err);
+        setEnvironments(prev =>
+          prev.map(environment =>
+            environment.id === environmentId
+              ? {
+                  ...environment,
+                  containers: environment.containers.map(c =>
+                    c.id === containerId
+                      ? { ...c, status: "running" as const }
+                      : c
+                  )
+                }
+              : environment
+          )
+        );
+        toast.error(`Failed to stop container Moodle ${container.moodleVersion}`);
+      });
+  };
+
+  const handleDeleteContainer = (environmentId: string, containerId: string) => {
+    const env = environments.find(e => e.id === environmentId);
+    const container = env?.containers.find(c => c.id === containerId);
+
+    if (!env || !container) return;
+
+    const previousStatus = container.status;
+
+    // Optimistically mark the container as stopping while the backend
+    // tears it down (docker-compose down stops and removes the container).
+    setEnvironments(prev =>
+      prev.map(environment =>
+        environment.id === environmentId
+          ? {
+              ...environment,
+              containers: environment.containers.map(c =>
+                c.id === containerId
+                  ? { ...c, status: "stopping" as const }
+                  : c
+              )
+            }
+          : environment
+      )
+    );
+
+    // Log the activity
+    if (auth.currentUser) {
+      auditLog.logActivity(
+        auth.currentUser.id,
+        `${auth.currentUser.firstName} ${auth.currentUser.lastName}`,
+        auth.currentUser.email,
+        'delete',
+        'container',
+        {
+          previousStatus,
+          moodleVersion: container.moodleVersion,
+          environmentName: env.name
+        },
+        containerId,
+        `${env.name} - Moodle ${container.moodleVersion}`
       );
-      toast.success(`Container Moodle ${container?.moodleVersion} stopped successfully!`);
-    }, 2000);
+    }
+
+    apiDeleteContainer(env.name, container.moodleVersion)
+      .then(() => {
+        setEnvironments(prev =>
+          prev.map(environment =>
+            environment.id === environmentId
+              ? {
+                  ...environment,
+                  containers: environment.containers.filter(c => c.id !== containerId)
+                }
+              : environment
+          )
+        );
+        toast.success(`Container Moodle ${container.moodleVersion} deleted successfully!`);
+      })
+      .catch((err) => {
+        console.error("Failed to delete container:", err);
+        setEnvironments(prev =>
+          prev.map(environment =>
+            environment.id === environmentId
+              ? {
+                  ...environment,
+                  containers: environment.containers.map(c =>
+                    c.id === containerId
+                      ? { ...c, status: previousStatus }
+                      : c
+                  )
+                }
+              : environment
+          )
+        );
+        toast.error(`Failed to delete container Moodle ${container.moodleVersion}`);
+      });
   };
 
   const handleAddContainer = (environmentId: string, moodleVersions: string[], advancedConfig?: any) => {
@@ -868,9 +987,10 @@ export default function App() {
       return;
     }
     const env = environments.find(e => e.id === id);
+    if (!env) return;
 
     // Log the activity
-    if (auth.currentUser && env) {
+    if (auth.currentUser) {
       auditLog.logActivity(
         auth.currentUser.id,
         `${auth.currentUser.firstName} ${auth.currentUser.lastName}`,
@@ -887,8 +1007,20 @@ export default function App() {
       );
     }
 
-    setEnvironments(prev => prev.filter(env => env.id !== id));
-    toast.success(`Environment "${env?.name}" deleted successfully!`);
+    const previousEnvironments = environments;
+
+    // Optimistically remove the environment
+    setEnvironments(prev => prev.filter(e => e.id !== id));
+
+    apiDeleteInfrastructure(env.name)
+      .then(() => {
+        toast.success(`Environment "${env.name}" deleted successfully!`);
+      })
+      .catch((err) => {
+        console.error("Failed to delete infrastructure:", err);
+        setEnvironments(previousEnvironments);
+        toast.error(`Failed to delete environment "${env.name}"`);
+      });
   };
 
   const handleTogglePin = (id: string) => {
@@ -1266,6 +1398,7 @@ export default function App() {
               pluginVersions={mockPluginVersions}
               onStartContainer={handleStartContainer}
               onStopContainer={handleStopContainer}
+              onDeleteContainer={handleDeleteContainer}
               onDeleteEnvironment={handleDeleteEnvironment}
               onAddContainer={handleAddContainer}
               onRowClick={handleRowClick}
