@@ -26,7 +26,7 @@ import type { User } from "./types/user";
 import { mockPluginVersions } from "./types/plugin";
 import type { Plugin } from "./types/plugin";
 import { toast } from "sonner";
-import { fetchInfrastructures, startContainer as apiStartContainer, stopContainer as apiStopContainer, deleteContainer as apiDeleteContainer, deleteInfrastructure as apiDeleteInfrastructure, fetchPlugins as apiFetchPlugins, createPlugin as apiCreatePlugin, updatePlugin as apiUpdatePlugin, deletePlugin as apiDeletePlugin, createInfrastructure as apiCreateInfrastructure } from "./services/api";
+import { fetchInfrastructures, startContainer as apiStartContainer, stopContainer as apiStopContainer, deleteContainer as apiDeleteContainer, deleteInfrastructure as apiDeleteInfrastructure, fetchPlugins as apiFetchPlugins, createPlugin as apiCreatePlugin, updatePlugin as apiUpdatePlugin, deletePlugin as apiDeletePlugin, createInfrastructure as apiCreateInfrastructure, addContainers as apiAddContainers } from "./services/api";
 
 const generateDetailedEnvironment = (env: Environment): DetailedEnvironment => ({
   ...env,
@@ -326,6 +326,21 @@ export default function App() {
       });
   }, []);
 
+  // Poll the backend while any container is still provisioning, so the list
+  // updates automatically once setup + build finish.
+  const hasProvisioningContainers = environments.some(env =>
+    env.containers.some(c => c.status === "provisioning")
+  );
+  useEffect(() => {
+    if (!hasProvisioningContainers) return;
+    const interval = setInterval(() => {
+      fetchInfrastructures()
+        .then(setEnvironments)
+        .catch((err) => console.error("Failed to refresh infrastructures:", err));
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [hasProvisioningContainers]);
+
   // Fetch plugin catalog from the API
   useEffect(() => {
     apiFetchPlugins()
@@ -533,7 +548,7 @@ export default function App() {
       }
 
       toast.success(
-        `Environment "${newEnv.name}" with ${newEnv.moodleVersions.length} ${containerText} created!`,
+        `Environment "${newEnv.name}" is being provisioned. It'll appear ready in the list shortly.`,
         { id: toastId }
       );
     } catch (err) {
@@ -843,7 +858,7 @@ export default function App() {
     setIsAddContainerModalOpen(true);
   };
 
-  const handleCreateContainer = (containerData: {
+  const handleCreateContainer = async (containerData: {
     name: string;
     plugin: string;
     version: string;
@@ -855,59 +870,47 @@ export default function App() {
   }) => {
     if (!addContainerEnvironment) return;
 
-    const newContainers: MoodleContainer[] = containerData.moodleVersions.map((moodleVersion, index) => ({
-      id: `container-${Date.now()}-${index}`,
-      moodleVersion,
-      status: "provisioning" as const,
-      url: `https://focused-cray.92-205-184-244.plesk.page/${addContainerEnvironment.name}/${moodleVersion.replace(/\./g, '-')}/`,
-      adminPassword: generatePassword(),
-      createdAt: "Just now",
-    }));
-
-    setEnvironments(prev =>
-      prev.map(environment =>
-        environment.id === addContainerEnvironment.id
-          ? {
-              ...environment,
-              containers: [...environment.containers, ...newContainers]
-            }
-          : environment
-      )
+    const versionsText = containerData.moodleVersions.length === 1 ? "container" : "containers";
+    const toastId = toast.loading(
+      `Adding ${containerData.moodleVersions.length} ${versionsText} to "${addContainerEnvironment.name}"…`
     );
 
-    // Start provisioning timelines for new containers
-    newContainers.forEach(container => {
-      const timeline = createProvisioningTimeline(addContainerEnvironment);
-      setActiveTimelines(prev => new Map(prev.set(container.id, timeline)));
-      simulateProvisioningStep(container.id, 0);
-    });
+    try {
+      await apiAddContainers(addContainerEnvironment.name, containerData.moodleVersions);
 
-    // Log the activity
-    if (auth.currentUser) {
-      auditLog.logActivity(
-        auth.currentUser.id,
-        `${auth.currentUser.firstName} ${auth.currentUser.lastName}`,
-        auth.currentUser.email,
-        'create',
-        'container',
-        {
-          moodleVersions: containerData.moodleVersions,
-          environmentName: addContainerEnvironment.name,
-          containersAdded: newContainers.length,
-          ...(containerData.advancedConfig && {
-            advancedConfig: {
-              additionalPluginsCount: containerData.advancedConfig.additionalPlugins.length,
-              additionalPlugins: containerData.advancedConfig.additionalPlugins,
-            }
-          })
-        },
-        addContainerEnvironment.id,
-        addContainerEnvironment.name
+      // Reload so the backend's provisioning placeholders show up in the UI.
+      const envs = await fetchInfrastructures();
+      setEnvironments(envs);
+
+      // Log the activity
+      if (auth.currentUser) {
+        auditLog.logActivity(
+          auth.currentUser.id,
+          `${auth.currentUser.firstName} ${auth.currentUser.lastName}`,
+          auth.currentUser.email,
+          'create',
+          'container',
+          {
+            moodleVersions: containerData.moodleVersions,
+            environmentName: addContainerEnvironment.name,
+            containersAdded: containerData.moodleVersions.length,
+          },
+          addContainerEnvironment.id,
+          addContainerEnvironment.name
+        );
+      }
+
+      toast.success(
+        `${containerData.moodleVersions.length} ${versionsText} being provisioned for "${addContainerEnvironment.name}".`,
+        { id: toastId }
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      toast.error(
+        `Failed to add containers to "${addContainerEnvironment.name}": ${message}`,
+        { id: toastId }
       );
     }
-
-    const containerText = newContainers.length === 1 ? 'container' : 'containers';
-    toast.success(`${newContainers.length} ${containerText} added to environment "${addContainerEnvironment.name}"!`);
 
     // Close modal and reset state
     setIsAddContainerModalOpen(false);

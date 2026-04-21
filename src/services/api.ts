@@ -101,6 +101,30 @@ export async function createInfrastructure(
   }
 }
 
+export async function addContainers(
+  infrastructureName: string,
+  moodleVersions: string[]
+): Promise<void> {
+  const response = await fetch(
+    `/api/infrastructures/${encodeURIComponent(infrastructureName)}/containers`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ moodle_versions: moodleVersions }),
+    }
+  );
+  if (!response.ok) {
+    let detail = await response.text();
+    try {
+      const parsed = JSON.parse(detail);
+      if (parsed && parsed.detail) detail = parsed.detail;
+    } catch {
+      // keep raw text
+    }
+    throw new Error(`Failed to add containers: ${response.status} ${detail}`);
+  }
+}
+
 export async function startContainer(
   infrastructureName: string,
   moodleVersion: string

@@ -185,6 +185,22 @@ export function CreateEnvironmentModal({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isAddContainerMode) {
+      if (moodleVersions.length === 0) return;
+      // In add-container mode the plugin/version are already fixed on the
+      // environment; we only emit the moodle versions. Reuse the same
+      // callback — App-level handler distinguishes via isAddContainerMode.
+      onCreateEnvironment({
+        name: prefilledEnvironment?.name ?? "",
+        plugin: prefilledEnvironment?.plugin ?? "",
+        version: prefilledEnvironment?.version ?? "",
+        versionType: "branch", // unused in add-container path
+        moodleVersions,
+      });
+      setMoodleVersions([]);
+      onOpenChange(false);
+      return;
+    }
     if (name && selectedPluginId && version && moodleVersions.length > 0 && selectedPlugin) {
       const selectedVersion = availableVersions.find(v => v.ref === version);
       const versionType = selectedVersion?.type ?? "branch";
@@ -230,120 +246,120 @@ export function CreateEnvironmentModal({
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="space-y-2">
-            <Label htmlFor="environment-name">Environment Name</Label>
-            <Input
-              id="environment-name"
-              placeholder="e.g., quiz-feature-testing"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              disabled={isAddContainerMode}
-              required
-            />
-            {isAddContainerMode && (
-              <p className="text-sm text-muted-foreground">
-                Adding containers to existing environment
-              </p>
-            )}
-          </div>
+          {!isAddContainerMode && (
+            <div className="space-y-2">
+              <Label htmlFor="environment-name">Environment Name</Label>
+              <Input
+                id="environment-name"
+                placeholder="e.g., quiz-feature-testing"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+              />
+            </div>
+          )}
 
-          <div className="space-y-2">
-            <Label htmlFor="plugin-select">Plugin</Label>
-            <Select value={selectedPluginId} onValueChange={handlePluginChange} required disabled={isAddContainerMode}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select a plugin" />
-              </SelectTrigger>
-              <SelectContent>
-                {activePlugins.length === 0 ? (
-                  <SelectItem value="no-plugins" disabled>
-                    No active plugins available
-                  </SelectItem>
-                ) : (
-                  activePlugins.map((plugin) => (
-                    <SelectItem key={plugin.id} value={plugin.id}>
-                      <div className="flex items-center gap-2">
-                        <span>{plugin.displayName}</span>
-                        <Badge variant="outline" className="text-xs">
-                          {plugin.type}
-                        </Badge>
-                      </div>
+          {!isAddContainerMode && (
+            <div className="space-y-2">
+              <Label htmlFor="plugin-select">Plugin</Label>
+              <Select value={selectedPluginId} onValueChange={handlePluginChange} required>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a plugin" />
+                </SelectTrigger>
+                <SelectContent>
+                  {activePlugins.length === 0 ? (
+                    <SelectItem value="no-plugins" disabled>
+                      No active plugins available
                     </SelectItem>
-                  ))
-                )}
-              </SelectContent>
-            </Select>
-            {selectedPlugin && (
-              <div className="text-sm text-muted-foreground space-y-1">
-                <p>
-                  <span className="font-medium">Path:</span>{" "}
-                  <code className="bg-muted px-1 py-0.5 rounded text-xs">
-                    {selectedPlugin.installationPath}
-                  </code>
+                  ) : (
+                    activePlugins.map((plugin) => (
+                      <SelectItem key={plugin.id} value={plugin.id}>
+                        <div className="flex items-center gap-2">
+                          <span>{plugin.displayName}</span>
+                          <Badge variant="outline" className="text-xs">
+                            {plugin.type}
+                          </Badge>
+                        </div>
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+              {selectedPlugin && (
+                <div className="text-sm text-muted-foreground space-y-1">
+                  <p>
+                    <span className="font-medium">Path:</span>{" "}
+                    <code className="bg-muted px-1 py-0.5 rounded text-xs">
+                      {selectedPlugin.installationPath}
+                    </code>
+                  </p>
+                  {selectedPlugin.description && (
+                    <p>{selectedPlugin.description}</p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {!isAddContainerMode && (
+            <div className="space-y-2">
+              <Label htmlFor="version-select">Plugin Version</Label>
+              <Select
+                value={version}
+                onValueChange={setVersion}
+                required
+                disabled={!selectedPluginId || versionsLoading}
+              >
+                <SelectTrigger>
+                  <SelectValue
+                    placeholder={
+                      !selectedPluginId
+                        ? "Select a plugin first"
+                        : versionsLoading
+                          ? "Loading versions from GitHub…"
+                          : "Select version/git reference"
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableVersions.length === 0 ? (
+                    <SelectItem value="no-versions" disabled>
+                      {selectedPluginId
+                        ? versionsLoading
+                          ? "Loading…"
+                          : "No versions available"
+                        : "Select a plugin first"}
+                    </SelectItem>
+                  ) : (
+                    availableVersions.map((v) => (
+                      <SelectItem key={v.ref} value={v.ref}>
+                        <div className="flex items-center gap-2">
+                          <span>{v.name}</span>
+                          <Badge
+                            variant="outline"
+                            className={
+                              v.type === "branch"
+                                ? "text-info border-info/20 bg-info/10"
+                                : v.type === "pr"
+                                  ? "text-warning border-warning/20 bg-warning/10"
+                                  : "text-success border-success/20 bg-success/10"
+                            }
+                          >
+                            {v.type}
+                          </Badge>
+                        </div>
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+              {versionsError && (
+                <p className="text-sm text-destructive">
+                  Could not load versions from GitHub: {versionsError}
                 </p>
-                {selectedPlugin.description && (
-                  <p>{selectedPlugin.description}</p>
-                )}
-              </div>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="version-select">Plugin Version</Label>
-            <Select
-              value={version}
-              onValueChange={setVersion}
-              required
-              disabled={!selectedPluginId || isAddContainerMode || versionsLoading}
-            >
-              <SelectTrigger>
-                <SelectValue
-                  placeholder={
-                    !selectedPluginId
-                      ? "Select a plugin first"
-                      : versionsLoading
-                        ? "Loading versions from GitHub…"
-                        : "Select version/git reference"
-                  }
-                />
-              </SelectTrigger>
-              <SelectContent>
-                {availableVersions.length === 0 ? (
-                  <SelectItem value="no-versions" disabled>
-                    {selectedPluginId
-                      ? versionsLoading
-                        ? "Loading…"
-                        : "No versions available"
-                      : "Select a plugin first"}
-                  </SelectItem>
-                ) : (
-                  availableVersions.map((v) => (
-                    <SelectItem key={v.ref} value={v.ref}>
-                      <div className="flex items-center gap-2">
-                        <span>{v.name}</span>
-                        <Badge
-                          variant="outline"
-                          className={
-                            v.type === "branch"
-                              ? "text-info border-info/20 bg-info/10"
-                              : v.type === "pr"
-                                ? "text-warning border-warning/20 bg-warning/10"
-                                : "text-success border-success/20 bg-success/10"
-                          }
-                        >
-                          {v.type}
-                        </Badge>
-                      </div>
-                    </SelectItem>
-                  ))
-                )}
-              </SelectContent>
-            </Select>
-            {versionsError && (
-              <p className="text-sm text-destructive">
-                Could not load versions from GitHub: {versionsError}
-              </p>
-            )}
-          </div>
+              )}
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="moodle-version-select">
@@ -415,6 +431,7 @@ export function CreateEnvironmentModal({
           </div>
 
           {/* Advanced Settings Collapsible */}
+          {!isAddContainerMode && (
           <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
             <div className="flex justify-end">
               <CollapsibleTrigger asChild>
@@ -504,6 +521,7 @@ export function CreateEnvironmentModal({
               </div>
             </CollapsibleContent>
           </Collapsible>
+          )}
 
           <DialogFooter className="pt-6">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
