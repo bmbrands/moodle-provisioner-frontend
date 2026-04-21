@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "./ui/dialog";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -10,6 +10,7 @@ import { Textarea } from "./ui/textarea";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "./ui/collapsible";
 import { ChevronDown, ChevronRight, Plus, X, Database, Cpu, Network } from "lucide-react";
 import type { Plugin, PluginVersion } from "../types/plugin";
+import { fetchPluginVersions } from "../services/api";
 
 interface CreateEnvironmentModalProps {
   open: boolean;
@@ -98,11 +99,47 @@ export function CreateEnvironmentModal({
     [plugins]
   );
 
-  // Get versions for the selected plugin
-  const availableVersions = useMemo(() => {
-    if (!selectedPluginId) return [];
-    return pluginVersions[selectedPluginId] || [];
-  }, [selectedPluginId, pluginVersions]);
+  // Get versions for the selected plugin (fetched live from the backend
+  // which proxies the GitHub API and caches responses).
+  const [availableVersions, setAvailableVersions] = useState<PluginVersion[]>([]);
+  const [versionsLoading, setVersionsLoading] = useState(false);
+  const [versionsError, setVersionsError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!selectedPluginId) {
+      setAvailableVersions([]);
+      setVersionsError(null);
+      return;
+    }
+    const plugin = plugins.find(p => p.id === selectedPluginId);
+    // Prefer freshly fetched refs; fall back to whatever the parent passed in.
+    const fallback = pluginVersions[selectedPluginId] || [];
+    if (!plugin?.repositoryUrl) {
+      setAvailableVersions(fallback);
+      setVersionsError(null);
+      return;
+    }
+    let cancelled = false;
+    setVersionsLoading(true);
+    setVersionsError(null);
+    fetchPluginVersions(plugin.repositoryUrl)
+      .then((versions) => {
+        if (cancelled) return;
+        setAvailableVersions(versions);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        console.error("Failed to fetch plugin versions:", err);
+        setVersionsError(err.message || "Failed to fetch versions");
+        setAvailableVersions(fallback);
+      })
+      .finally(() => {
+        if (!cancelled) setVersionsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedPluginId, plugins, pluginVersions]);
 
   // Get the selected plugin object
   const selectedPlugin = useMemo(() =>
@@ -250,21 +287,27 @@ export function CreateEnvironmentModal({
               value={version}
               onValueChange={setVersion}
               required
-              disabled={!selectedPluginId || isAddContainerMode}
+              disabled={!selectedPluginId || isAddContainerMode || versionsLoading}
             >
               <SelectTrigger>
                 <SelectValue
                   placeholder={
-                    selectedPluginId
-                      ? "Select version/git reference"
-                      : "Select a plugin first"
+                    !selectedPluginId
+                      ? "Select a plugin first"
+                      : versionsLoading
+                        ? "Loading versions from GitHub…"
+                        : "Select version/git reference"
                   }
                 />
               </SelectTrigger>
               <SelectContent>
                 {availableVersions.length === 0 ? (
                   <SelectItem value="no-versions" disabled>
-                    {selectedPluginId ? "No versions available" : "Select a plugin first"}
+                    {selectedPluginId
+                      ? versionsLoading
+                        ? "Loading…"
+                        : "No versions available"
+                      : "Select a plugin first"}
                   </SelectItem>
                 ) : (
                   availableVersions.map((v) => (
@@ -276,7 +319,9 @@ export function CreateEnvironmentModal({
                           className={
                             v.type === "branch"
                               ? "text-info border-info/20 bg-info/10"
-                              : "text-success border-success/20 bg-success/10"
+                              : v.type === "pr"
+                                ? "text-warning border-warning/20 bg-warning/10"
+                                : "text-success border-success/20 bg-success/10"
                           }
                         >
                           {v.type}
@@ -287,6 +332,11 @@ export function CreateEnvironmentModal({
                 )}
               </SelectContent>
             </Select>
+            {versionsError && (
+              <p className="text-sm text-destructive">
+                Could not load versions from GitHub: {versionsError}
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">

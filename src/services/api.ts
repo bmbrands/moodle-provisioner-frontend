@@ -1,4 +1,5 @@
 import type { Environment, MoodleContainer } from "../components/EnvironmentsTable";
+import type { PluginVersion } from "../types/plugin";
 
 interface ApiMoodleContainer {
   moodle_version: string;
@@ -126,4 +127,26 @@ export async function deleteInfrastructure(
     const detail = await response.text();
     throw new Error(`Failed to delete infrastructure: ${response.status} ${detail}`);
   }
+}
+
+interface ApiPluginVersion {
+  ref: string;
+  name: string;
+  type: "branch" | "tag" | "pr";
+}
+
+interface ApiPluginVersionsResponse {
+  versions: ApiPluginVersion[];
+}
+
+export async function fetchPluginVersions(repoUrl: string): Promise<PluginVersion[]> {
+  const response = await fetch(
+    `/api/plugins/refs?repo_url=${encodeURIComponent(repoUrl)}`
+  );
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`Failed to fetch plugin versions: ${response.status} ${detail}`);
+  }
+  const data: ApiPluginVersionsResponse = await response.json();
+  return data.versions;
 }
