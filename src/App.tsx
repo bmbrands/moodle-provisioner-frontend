@@ -23,10 +23,10 @@ import { useAuth } from "./hooks/useAuth";
 import { useAuditLog } from "./hooks/useAuditLog";
 import { mockUsers } from "./types/user";
 import type { User } from "./types/user";
-import { mockPlugins, mockPluginVersions } from "./types/plugin";
+import { mockPluginVersions } from "./types/plugin";
 import type { Plugin } from "./types/plugin";
 import { toast } from "sonner";
-import { fetchInfrastructures, startContainer as apiStartContainer, stopContainer as apiStopContainer, deleteContainer as apiDeleteContainer, deleteInfrastructure as apiDeleteInfrastructure } from "./services/api";
+import { fetchInfrastructures, startContainer as apiStartContainer, stopContainer as apiStopContainer, deleteContainer as apiDeleteContainer, deleteInfrastructure as apiDeleteInfrastructure, fetchPlugins as apiFetchPlugins, createPlugin as apiCreatePlugin, updatePlugin as apiUpdatePlugin, deletePlugin as apiDeletePlugin } from "./services/api";
 
 const generateDetailedEnvironment = (env: Environment): DetailedEnvironment => ({
   ...env,
@@ -292,7 +292,7 @@ export default function App() {
   const auditLog = useAuditLog();
   const [environments, setEnvironments] = useState<Environment[]>([]);
   const [users, setUsers] = useState<User[]>(mockUsers);
-  const [plugins, setPlugins] = useState<Plugin[]>(mockPlugins);
+  const [plugins, setPlugins] = useState<Plugin[]>([]);
   const [filters, setFilters] = useState<EnvironmentFilters>(defaultFilters);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -323,6 +323,16 @@ export default function App() {
         console.error("Failed to fetch infrastructures:", err);
         toast.error("Failed to load environments from API");
         setIsLoading(false);
+      });
+  }, []);
+
+  // Fetch plugin catalog from the API
+  useEffect(() => {
+    apiFetchPlugins()
+      .then(setPlugins)
+      .catch((err) => {
+        console.error("Failed to fetch plugins:", err);
+        toast.error("Failed to load plugin catalog from API");
       });
   }, []);
 
@@ -1177,6 +1187,7 @@ export default function App() {
 
     const newActiveStatus = !plugin.isActive;
 
+    // Optimistic update
     setPlugins(prev =>
       prev.map(p =>
         p.id === pluginId
@@ -1184,6 +1195,20 @@ export default function App() {
           : p
       )
     );
+
+    apiUpdatePlugin(pluginId, { isActive: newActiveStatus })
+      .then((updated) => {
+        setPlugins(prev => prev.map(p => (p.id === pluginId ? updated : p)));
+      })
+      .catch((err) => {
+        console.error("Failed to update plugin:", err);
+        // Revert
+        setPlugins(prev =>
+          prev.map(p => (p.id === pluginId ? { ...p, isActive: plugin.isActive } : p))
+        );
+        toast.error(`Failed to ${newActiveStatus ? 'activate' : 'deactivate'} plugin`);
+        return;
+      });
 
     // Log the activity
     if (auth.currentUser) {
@@ -1210,7 +1235,18 @@ export default function App() {
     const plugin = plugins.find(p => p.id === pluginId);
     if (!plugin) return;
 
+    const previous = plugins;
     setPlugins(prev => prev.filter(p => p.id !== pluginId));
+
+    apiDeletePlugin(pluginId)
+      .then(() => {
+        toast.success(`Plugin "${plugin.displayName}" deleted successfully`);
+      })
+      .catch((err) => {
+        console.error("Failed to delete plugin:", err);
+        setPlugins(previous);
+        toast.error(`Failed to delete plugin "${plugin.displayName}"`);
+      });
 
     // Log the activity
     if (auth.currentUser) {
@@ -1229,45 +1265,43 @@ export default function App() {
         plugin.displayName
       );
     }
-
-    toast.success(`Plugin "${plugin.displayName}" deleted successfully`);
   };
 
   const handleAddPlugin = (newPlugin: Omit<Plugin, 'id' | 'createdAt' | 'updatedAt'>) => {
-    const plugin: Plugin = {
-      ...newPlugin,
-      id: `plugin-${Date.now()}`,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      createdBy: auth.currentUser ? {
-        id: auth.currentUser.id,
-        name: `${auth.currentUser.firstName} ${auth.currentUser.lastName}`,
-        email: auth.currentUser.email
-      } : newPlugin.createdBy
-    };
+    const createdBy = auth.currentUser ? {
+      id: auth.currentUser.id,
+      name: `${auth.currentUser.firstName} ${auth.currentUser.lastName}`,
+      email: auth.currentUser.email
+    } : newPlugin.createdBy;
 
-    setPlugins(prev => [...prev, plugin]);
+    apiCreatePlugin({ ...newPlugin, createdBy })
+      .then((plugin) => {
+        setPlugins(prev => [...prev, plugin]);
+        toast.success(`Plugin "${plugin.displayName}" added successfully`);
 
-    // Log the activity
-    if (auth.currentUser) {
-      auditLog.logActivity(
-        auth.currentUser.id,
-        `${auth.currentUser.firstName} ${auth.currentUser.lastName}`,
-        auth.currentUser.email,
-        'create',
-        'plugin',
-        {
-          pluginType: plugin.type,
-          repositoryUrl: plugin.repositoryUrl,
-          installationPath: plugin.installationPath,
-          isActive: plugin.isActive
-        },
-        plugin.id,
-        plugin.displayName
-      );
-    }
-
-    toast.success(`Plugin "${plugin.displayName}" added successfully`);
+        // Log the activity
+        if (auth.currentUser) {
+          auditLog.logActivity(
+            auth.currentUser.id,
+            `${auth.currentUser.firstName} ${auth.currentUser.lastName}`,
+            auth.currentUser.email,
+            'create',
+            'plugin',
+            {
+              pluginType: plugin.type,
+              repositoryUrl: plugin.repositoryUrl,
+              installationPath: plugin.installationPath,
+              isActive: plugin.isActive
+            },
+            plugin.id,
+            plugin.displayName
+          );
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to create plugin:", err);
+        toast.error(`Failed to add plugin "${newPlugin.displayName}"`);
+      });
   };
 
   const simulateWebhookEnvironment = () => {

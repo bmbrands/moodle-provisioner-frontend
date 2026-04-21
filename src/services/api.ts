@@ -1,5 +1,5 @@
 import type { Environment, MoodleContainer } from "../components/EnvironmentsTable";
-import type { PluginVersion } from "../types/plugin";
+import type { Plugin, PluginVersion } from "../types/plugin";
 
 interface ApiMoodleContainer {
   moodle_version: string;
@@ -149,4 +149,58 @@ export async function fetchPluginVersions(repoUrl: string): Promise<PluginVersio
   }
   const data: ApiPluginVersionsResponse = await response.json();
   return data.versions;
+}
+
+interface ApiPluginListResponse {
+  plugins: Plugin[];
+}
+
+export async function fetchPlugins(): Promise<Plugin[]> {
+  const response = await fetch("/api/plugins");
+  if (!response.ok) {
+    throw new Error(`Failed to fetch plugins: ${response.status}`);
+  }
+  const data: ApiPluginListResponse = await response.json();
+  return data.plugins;
+}
+
+export async function createPlugin(
+  plugin: Omit<Plugin, "id" | "createdAt" | "updatedAt">
+): Promise<Plugin> {
+  const response = await fetch("/api/plugins", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(plugin),
+  });
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`Failed to create plugin: ${response.status} ${detail}`);
+  }
+  return response.json();
+}
+
+export async function updatePlugin(
+  pluginId: string,
+  updates: Partial<Omit<Plugin, "id" | "createdAt" | "updatedAt">>
+): Promise<Plugin> {
+  const response = await fetch(`/api/plugins/${encodeURIComponent(pluginId)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(updates),
+  });
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`Failed to update plugin: ${response.status} ${detail}`);
+  }
+  return response.json();
+}
+
+export async function deletePlugin(pluginId: string): Promise<void> {
+  const response = await fetch(`/api/plugins/${encodeURIComponent(pluginId)}`, {
+    method: "DELETE",
+  });
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`Failed to delete plugin: ${response.status} ${detail}`);
+  }
 }
