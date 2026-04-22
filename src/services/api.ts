@@ -17,6 +17,8 @@ interface ApiInfrastructure {
   git_ref_reference: string;
   created_at: string;
   moodles: ApiMoodleContainer[];
+  provisioning_phase?: string | null;
+  provisioning_error?: string | null;
 }
 
 interface ApiInfrastructureListResponse {
@@ -48,6 +50,7 @@ function formatDate(isoString: string): string {
 }
 
 function mapInfrastructureToEnvironment(infra: ApiInfrastructure): Environment {
+  const phase = infra.provisioning_phase as Environment["provisioningPhase"] | null | undefined;
   return {
     id: infra.name,
     name: infra.name,
@@ -62,6 +65,8 @@ function mapInfrastructureToEnvironment(infra: ApiInfrastructure): Environment {
       adminPassword: m.admin_password,
       createdAt: formatDate(m.created_at),
     })),
+    ...(phase ? { provisioningPhase: phase } : {}),
+    ...(infra.provisioning_error ? { provisioningError: infra.provisioning_error } : {}),
   };
 }
 
@@ -276,4 +281,89 @@ export async function fetchMoodleVersions(): Promise<MoodleVersion[]> {
   }
   const data: ApiMoodleVersionsResponse = await response.json();
   return data.versions;
+}
+
+// ---- Audit log ----------------------------------------------------------
+
+export interface AuditEntryDto {
+  id: string;
+  timestamp: string;
+  user_id: string;
+  user_name: string;
+  user_email: string;
+  action: string;
+  resource: string;
+  resource_id?: string | null;
+  resource_name?: string | null;
+  details: Record<string, any>;
+  ip_address?: string | null;
+  user_agent?: string | null;
+  severity: "low" | "medium" | "high" | "critical";
+}
+
+export interface CreateAuditEntryDto {
+  user_id: string;
+  user_name: string;
+  user_email: string;
+  action: string;
+  resource: string;
+  resource_id?: string;
+  resource_name?: string;
+  details?: Record<string, any>;
+  ip_address?: string;
+  user_agent?: string;
+  severity?: "low" | "medium" | "high" | "critical";
+}
+
+export async function fetchAuditLog(limit = 500): Promise<AuditEntryDto[]> {
+  const response = await fetch(`/api/audit?limit=${limit}`);
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`Failed to fetch audit log: ${response.status} ${detail}`);
+  }
+  const data: { entries: AuditEntryDto[] } = await response.json();
+  return data.entries;
+}
+
+export async function postAuditEntry(payload: CreateAuditEntryDto): Promise<AuditEntryDto> {
+  const response = await fetch("/api/audit", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`Failed to post audit entry: ${response.status} ${detail}`);
+  }
+  return response.json();
+}
+
+// ---- Settings ----------------------------------------------------------
+
+export type SettingValue = string | number | boolean;
+
+export async function fetchSettings(): Promise<Record<string, SettingValue>> {
+  const response = await fetch("/api/settings");
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`Failed to fetch settings: ${response.status} ${detail}`);
+  }
+  const data: { values: Record<string, SettingValue> } = await response.json();
+  return data.values ?? {};
+}
+
+export async function updateSettings(
+  values: Record<string, SettingValue>
+): Promise<Record<string, SettingValue>> {
+  const response = await fetch("/api/settings", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ values }),
+  });
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`Failed to save settings: ${response.status} ${detail}`);
+  }
+  const data: { values: Record<string, SettingValue> } = await response.json();
+  return data.values ?? {};
 }

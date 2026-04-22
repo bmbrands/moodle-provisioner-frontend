@@ -1,112 +1,37 @@
-import { useState, useCallback } from 'react';
-import type { AuditLogEntry, AuditAction, AuditResource, getActionSeverity } from '../types/audit';
+import { useState, useCallback, useEffect } from 'react';
+import type { AuditLogEntry, AuditAction, AuditResource } from '../types/audit';
 import { getActionSeverity as calculateSeverity } from '../types/audit';
+import { fetchAuditLog, postAuditEntry } from '../services/api';
+import type { AuditEntryDto } from '../services/api';
 
-const mockAuditLogs: AuditLogEntry[] = [
-  {
-    id: 'audit-1',
-    timestamp: '2024-01-15T14:30:00Z',
-    userId: 'user-1',
-    userName: 'John Doe',
-    userEmail: 'john.doe@moodle.org',
-    action: 'create',
-    resource: 'environment',
-    resourceId: 'env-1',
-    resourceName: 'quiz-testing-dev',
-    details: {
-      plugin: 'mod_quiz',
-      version: 'develop',
-      moodleVersion: '4.3.0'
-    },
-    ipAddress: '192.168.1.100',
-    userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
-    severity: 'medium'
-  },
-  {
-    id: 'audit-2', 
-    timestamp: '2024-01-15T13:45:00Z',
-    userId: 'user-2',
-    userName: 'Jane Smith',
-    userEmail: 'jane.smith@moodle.org',
-    action: 'copy_password',
-    resource: 'environment',
-    resourceId: 'env-2',
-    resourceName: 'forum-bugfix',
-    details: {
-      passwordCopied: true
-    },
-    ipAddress: '192.168.1.101',
-    severity: 'medium'
-  },
-  {
-    id: 'audit-3',
-    timestamp: '2024-01-15T12:20:00Z', 
-    userId: 'user-1',
-    userName: 'John Doe',
-    userEmail: 'john.doe@moodle.org',
-    action: 'delete',
-    resource: 'environment',
-    resourceId: 'env-old-1',
-    resourceName: 'old-test-env',
-    details: {
-      reason: 'Cleanup old test environments'
-    },
-    ipAddress: '192.168.1.100',
-    severity: 'high'
-  },
-  {
-    id: 'audit-4',
-    timestamp: '2024-01-15T11:10:00Z',
-    userId: 'user-1', 
-    userName: 'John Doe',
-    userEmail: 'john.doe@moodle.org',
-    action: 'create',
-    resource: 'user',
-    resourceId: 'user-2',
-    resourceName: 'Jane Smith',
-    details: {
-      email: 'jane.smith@moodle.org',
-      roles: ['tester']
-    },
-    ipAddress: '192.168.1.100',
-    severity: 'medium'
-  },
-  {
-    id: 'audit-5',
-    timestamp: '2024-01-15T10:30:00Z',
-    userId: 'user-2',
-    userName: 'Jane Smith', 
-    userEmail: 'jane.smith@moodle.org',
-    action: 'login',
-    resource: 'system',
-    details: {
-      loginMethod: 'email',
-      sessionId: 'sess-123'
-    },
-    ipAddress: '192.168.1.101',
-    severity: 'low'
-  },
-  {
-    id: 'audit-6',
-    timestamp: '2024-01-15T09:15:00Z',
-    userId: 'user-1',
-    userName: 'John Doe',
-    userEmail: 'john.doe@moodle.org',
-    action: 'stop',
-    resource: 'environment', 
-    resourceId: 'env-3',
-    resourceName: 'theme-preview',
-    details: {
-      previousStatus: 'running',
-      reason: 'Maintenance'
-    },
-    ipAddress: '192.168.1.100',
-    severity: 'medium'
-  }
-];
+function dtoToEntry(dto: AuditEntryDto): AuditLogEntry {
+  return {
+    id: dto.id,
+    timestamp: dto.timestamp,
+    userId: dto.user_id,
+    userName: dto.user_name,
+    userEmail: dto.user_email,
+    action: dto.action as AuditAction,
+    resource: dto.resource as AuditResource,
+    resourceId: dto.resource_id ?? undefined,
+    resourceName: dto.resource_name ?? undefined,
+    details: dto.details ?? {},
+    ipAddress: dto.ip_address ?? undefined,
+    userAgent: dto.user_agent ?? undefined,
+    severity: dto.severity,
+  };
+}
 
 export function useAuditLog() {
-  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>(mockAuditLogs);
+  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
+
+  // Load from backend on mount. Failures are non-fatal (we'll start with an
+  // empty log and future appends will still be persisted).
+  useEffect(() => {
+    fetchAuditLog(500)
+      .then(entries => setAuditLogs(entries.map(dtoToEntry)))
+      .catch(err => console.error('Failed to load audit log:', err));
+  }, []);
 
   const logActivity = useCallback((
     userId: string,
@@ -118,8 +43,9 @@ export function useAuditLog() {
     resourceId?: string,
     resourceName?: string
   ) => {
-    const entry: AuditLogEntry = {
-      id: `audit-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    const severity = calculateSeverity(action, resource);
+    const optimistic: AuditLogEntry = {
+      id: `audit-local-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
       timestamp: new Date().toISOString(),
       userId,
       userName,
@@ -129,13 +55,36 @@ export function useAuditLog() {
       resourceId,
       resourceName,
       details,
-      ipAddress: '192.168.1.100', // Mock IP - in real app would get from request
       userAgent: navigator.userAgent,
-      severity: calculateSeverity(action, resource)
+      severity,
     };
+    // Optimistic prepend.
+    setAuditLogs(prev => [optimistic, ...prev]);
 
-    setAuditLogs(prev => [entry, ...prev]);
-    return entry;
+    // Fire-and-forget persistence; replace the optimistic entry with the
+    // server-assigned one on success so subsequent reloads are consistent.
+    postAuditEntry({
+      user_id: userId,
+      user_name: userName,
+      user_email: userEmail,
+      action,
+      resource,
+      resource_id: resourceId,
+      resource_name: resourceName,
+      details,
+      user_agent: navigator.userAgent,
+      severity,
+    })
+      .then(persisted => {
+        setAuditLogs(prev =>
+          prev.map(e => (e.id === optimistic.id ? dtoToEntry(persisted) : e))
+        );
+      })
+      .catch(err => {
+        console.error('Failed to persist audit entry:', err);
+      });
+
+    return optimistic;
   }, []);
 
   const getFilteredLogs = useCallback((
@@ -162,7 +111,7 @@ export function useAuditLog() {
         if (!filters.users.includes(log.userId)) return false;
       }
 
-      // Actions filter  
+      // Actions filter
       if (filters.actions && filters.actions.length > 0) {
         if (!filters.actions.includes(log.action)) return false;
       }

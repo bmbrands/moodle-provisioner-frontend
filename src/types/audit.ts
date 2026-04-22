@@ -14,25 +14,33 @@ export interface AuditLogEntry {
   severity: 'low' | 'medium' | 'high' | 'critical';
 }
 
-export type AuditAction = 
-  | 'create' 
-  | 'update' 
-  | 'delete' 
-  | 'start' 
-  | 'stop' 
-  | 'login' 
-  | 'logout' 
-  | 'view' 
+export type AuditAction =
+  | 'create'
+  | 'update'
+  | 'delete'
+  | 'start'
+  | 'stop'
+  | 'login'
+  | 'logout'
+  | 'view'
   | 'copy_password'
   | 'export'
-  | 'import';
+  | 'import'
+  | 'filter'
+  | 'clear_filters'
+  | 'pin'
+  | 'unpin'
+  | 'activate'
+  | 'deactivate';
 
-export type AuditResource = 
-  | 'environment' 
-  | 'user' 
-  | 'role' 
-  | 'account' 
-  | 'settings' 
+export type AuditResource =
+  | 'environment'
+  | 'container'
+  | 'plugin'
+  | 'user'
+  | 'role'
+  | 'account'
+  | 'settings'
   | 'system'
   | 'timeline';
 
@@ -51,7 +59,7 @@ export interface AuditFilters {
 export const auditActionLabels: Record<AuditAction, string> = {
   create: 'Created',
   update: 'Updated',
-  delete: 'Deleted', 
+  delete: 'Deleted',
   start: 'Started',
   stop: 'Stopped',
   login: 'Logged In',
@@ -59,11 +67,19 @@ export const auditActionLabels: Record<AuditAction, string> = {
   view: 'Viewed',
   copy_password: 'Copied Password',
   export: 'Exported',
-  import: 'Imported'
+  import: 'Imported',
+  filter: 'Filtered',
+  clear_filters: 'Cleared Filters',
+  pin: 'Pinned',
+  unpin: 'Unpinned',
+  activate: 'Activated',
+  deactivate: 'Deactivated'
 };
 
 export const auditResourceLabels: Record<AuditResource, string> = {
   environment: 'Environment',
+  container: 'Container',
+  plugin: 'Plugin',
   user: 'User',
   role: 'Role',
   account: 'Account',
@@ -75,7 +91,7 @@ export const auditResourceLabels: Record<AuditResource, string> = {
 export const getSeverityColor = (severity: AuditLogEntry['severity']) => {
   switch (severity) {
     case 'critical': return 'destructive';
-    case 'high': return 'secondary'; 
+    case 'high': return 'secondary';
     case 'medium': return 'default';
     case 'low': return 'outline';
     default: return 'outline';

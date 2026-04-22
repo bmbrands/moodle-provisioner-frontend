@@ -6,7 +6,6 @@ import { Label } from "./ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Badge } from "./ui/badge";
 import { Checkbox } from "./ui/checkbox";
-import { Textarea } from "./ui/textarea";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "./ui/collapsible";
 import { ChevronDown, ChevronRight, Plus, X } from "lucide-react";
 import type { Plugin, PluginVersion } from "../types/plugin";

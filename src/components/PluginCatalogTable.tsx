@@ -13,6 +13,7 @@ interface PluginCatalogTableProps {
   onToggleActive: (pluginId: string) => void;
   onDeletePlugin: (pluginId: string) => void;
   onAddPlugin: () => void;
+  onEditPlugin?: (plugin: Plugin) => void;
 }
 
 const pluginTypeColors: Record<Plugin['type'], string> = {
@@ -35,7 +36,7 @@ const pluginTypeLabels: Record<Plugin['type'], string> = {
   other: "Other"
 };
 
-export function PluginCatalogTable({ plugins, onToggleActive, onDeletePlugin, onAddPlugin }: PluginCatalogTableProps) {
+export function PluginCatalogTable({ plugins, onToggleActive, onDeletePlugin, onAddPlugin, onEditPlugin }: PluginCatalogTableProps) {
   const handleOpenRepository = (url: string) => {
     window.open(url, '_blank');
   };
@@ -196,8 +197,13 @@ export function PluginCatalogTable({ plugins, onToggleActive, onDeletePlugin, on
                           View Repository
                         </DropdownMenuItem>
                         <DropdownMenuItem
-                          onClick={() => toast.info("Edit functionality coming soon")}
-                          className="text-muted-foreground"
+                          onClick={() => {
+                            if (onEditPlugin) {
+                              onEditPlugin(plugin);
+                            } else {
+                              toast.info("Edit functionality coming soon");
+                            }
+                          }}
                         >
                           <Edit className="h-4 w-4 mr-2" />
                           Edit Plugin

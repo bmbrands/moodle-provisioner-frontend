@@ -41,6 +41,10 @@ export interface Environment {
     email: string;
   };
   createdAt: string;
+  // Real-time provisioning state from the backend. Present only while the
+  // infrastructure is being set up (queued → cloning → building → finalizing).
+  provisioningPhase?: "queued" | "cloning" | "building" | "finalizing" | "error";
+  provisioningError?: string;
 }
 
 const getVersionUrl = (plugin: Plugin | undefined, version: string, pluginVersions: Record<string, PluginVersion[]>) => {
@@ -315,8 +319,15 @@ export function EnvironmentsTable({
                                   Moodle {container.moodleVersion}
                                 </span>
                                 <Badge variant={containerStatusBadge.variant} className={containerStatusBadge.className}>
-                                  {container.status}
+                                  {container.status === "provisioning" && env.provisioningPhase
+                                    ? `provisioning · ${env.provisioningPhase}`
+                                    : container.status}
                                 </Badge>
+                                {env.provisioningError && container.status === "provisioning" && (
+                                  <Badge variant="destructive" className="text-xs">
+                                    error
+                                  </Badge>
+                                )}
                               </div>
                               {container.advancedConfig && (
                                 <div className="flex items-center gap-2 mt-1 text-sm">

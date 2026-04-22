@@ -243,7 +243,6 @@ export function ContainerDetailsModal({
                                 size="sm"
                                 variant="outline"
                                 onClick={() => onStartContainer(environment.id, containerData.id)}
-                                disabled={containerData.status === "starting" || containerData.status === "provisioning"}
                                 className="border-success text-success hover:bg-success hover:text-success-foreground"
                               >
                                 <Play className="h-4 w-4 mr-1" />

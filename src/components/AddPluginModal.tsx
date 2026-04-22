@@ -5,7 +5,7 @@ import { Textarea } from "./ui/textarea";
 import { Label } from "./ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Switch } from "./ui/switch";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Plugin } from "../types/plugin";
 import { toast } from "sonner";
 
@@ -13,6 +13,12 @@ interface AddPluginModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onAddPlugin: (plugin: Omit<Plugin, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  /** When provided, the modal runs in edit mode and calls onUpdatePlugin on submit. */
+  editingPlugin?: Plugin | null;
+  onUpdatePlugin?: (
+    pluginId: string,
+    updates: Partial<Omit<Plugin, 'id' | 'createdAt' | 'updatedAt'>>
+  ) => void;
 }
 
 const pluginTypes = [
@@ -25,18 +31,44 @@ const pluginTypes = [
   { value: "other", label: "Other" }
 ];
 
-export function AddPluginModal({ open, onOpenChange, onAddPlugin }: AddPluginModalProps) {
-  const [formData, setFormData] = useState({
-    name: "",
-    displayName: "",
-    repositoryUrl: "",
-    installationPath: "",
-    description: "",
-    type: "" as Plugin['type'],
-    isActive: true
-  });
+const emptyForm = {
+  name: "",
+  displayName: "",
+  repositoryUrl: "",
+  installationPath: "",
+  description: "",
+  type: "" as Plugin['type'],
+  isActive: true,
+};
+
+export function AddPluginModal({
+  open,
+  onOpenChange,
+  onAddPlugin,
+  editingPlugin,
+  onUpdatePlugin,
+}: AddPluginModalProps) {
+  const isEditMode = !!editingPlugin;
+  const [formData, setFormData] = useState(emptyForm);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Sync form with the plugin being edited whenever it changes or the modal opens.
+  useEffect(() => {
+    if (open && editingPlugin) {
+      setFormData({
+        name: editingPlugin.name,
+        displayName: editingPlugin.displayName,
+        repositoryUrl: editingPlugin.repositoryUrl,
+        installationPath: editingPlugin.installationPath,
+        description: editingPlugin.description ?? "",
+        type: editingPlugin.type,
+        isActive: editingPlugin.isActive,
+      });
+    } else if (open && !editingPlugin) {
+      setFormData(emptyForm);
+    }
+  }, [open, editingPlugin]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,6 +95,20 @@ export function AddPluginModal({ open, onOpenChange, onAddPlugin }: AddPluginMod
         return;
       }
 
+      if (isEditMode && editingPlugin && onUpdatePlugin) {
+        onUpdatePlugin(editingPlugin.id, {
+          name: formData.name.toLowerCase().replace(/[^a-z0-9_]/g, '_'),
+          displayName: formData.displayName.trim(),
+          repositoryUrl: formData.repositoryUrl.trim(),
+          installationPath: formData.installationPath.trim(),
+          description: formData.description.trim() || undefined,
+          type: formData.type,
+          isActive: formData.isActive,
+        });
+        onOpenChange(false);
+        return;
+      }
+
       const newPlugin: Omit<Plugin, 'id' | 'createdAt' | 'updatedAt'> = {
         name: formData.name.toLowerCase().replace(/[^a-z0-9_]/g, '_'),
         displayName: formData.displayName.trim(),
@@ -81,36 +127,22 @@ export function AddPluginModal({ open, onOpenChange, onAddPlugin }: AddPluginMod
       onAddPlugin(newPlugin);
 
       // Reset form
-      setFormData({
-        name: "",
-        displayName: "",
-        repositoryUrl: "",
-        installationPath: "",
-        description: "",
-        type: "" as Plugin['type'],
-        isActive: true
-      });
+      setFormData(emptyForm);
 
       onOpenChange(false);
       toast.success("Plugin added successfully!");
 
     } catch (error) {
-      toast.error("Failed to add plugin. Please try again.");
+      toast.error(
+        isEditMode ? "Failed to update plugin. Please try again." : "Failed to add plugin. Please try again."
+      );
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleCancel = () => {
-    setFormData({
-      name: "",
-      displayName: "",
-      repositoryUrl: "",
-      installationPath: "",
-      description: "",
-      type: "" as Plugin['type'],
-      isActive: true
-    });
+    setFormData(emptyForm);
     onOpenChange(false);
   };
 
@@ -118,9 +150,11 @@ export function AddPluginModal({ open, onOpenChange, onAddPlugin }: AddPluginMod
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent size="default" className="shadow-2xl">
         <DialogHeader>
-          <DialogTitle>Add New Plugin</DialogTitle>
+          <DialogTitle>{isEditMode ? "Edit Plugin" : "Add New Plugin"}</DialogTitle>
           <DialogDescription>
-            Add a new Moodle plugin to the catalog for test environment creation.
+            {isEditMode
+              ? "Update the plugin details in the catalog."
+              : "Add a new Moodle plugin to the catalog for test environment creation."}
           </DialogDescription>
         </DialogHeader>
 
@@ -260,7 +294,9 @@ export function AddPluginModal({ open, onOpenChange, onAddPlugin }: AddPluginMod
               disabled={isSubmitting}
               className="bg-success hover:bg-success/90 text-success-foreground"
             >
-              {isSubmitting ? "Adding..." : "Add Plugin"}
+              {isSubmitting
+                ? (isEditMode ? "Saving..." : "Adding...")
+                : (isEditMode ? "Save Changes" : "Add Plugin")}
             </Button>
           </div>
         </form>

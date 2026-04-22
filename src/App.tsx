@@ -87,205 +87,7 @@ const generateDetailedContainer = (env: Environment, container: MoodleContainer)
   }
 });
 
-const mockEnvironments: Environment[] = [
-  {
-    id: "env-1",
-    name: "filters",
-    plugin: "theme_boost_union",
-    version: "PR#1026",
-    createdAt: "3 days ago",
-    isPinned: true,
-    isWebhookCreated: true,
-    pullRequestUrl: "https://github.com/moodle-an-hochschulen/moodle-theme_boost_union/pull/1026",
-    pullRequestNumber: 1026,
-    createdBy: {
-      id: "webhook-system",
-      name: "GitHub Webhook",
-      email: "webhook@system.local"
-    },
-    containers: [
-      {
-        id: "container-1-1",
-        moodleVersion: "5.0.2",
-        status: "running",
-        url: "https://focused-cray.92-205-184-244.plesk.page/filters/5.0.2/",
-        adminPassword: "Kj9#mP2$vL5@nB8!",
-        createdAt: "3 days ago",
-        advancedConfig: {
-          database: "postgres15",
-          phpVersion: "8.2",
-          enableMLBackend: true,
-          additionalPlugins: ["customfield_semester"]
-        }
-      },
-      {
-        id: "container-1-2",
-        moodleVersion: "4.5.6",
-        status: "stopped",
-        url: "https://focused-cray.92-205-184-244.plesk.page/filters/4.5.6/",
-        adminPassword: "Ht4$qR7#nM9@xC3!",
-        createdAt: "3 days ago",
-        advancedConfig: {
-          database: "mariadb10.11",
-          phpVersion: "8.1",
-          enableMLBackend: false,
-          additionalPlugins: []
-        }
-      }
-    ]
-  },
-  {
-    id: "env-2",
-    name: "calendar-config",
-    plugin: "mod_bookit",
-    version: "67-calendar-implement-config-settings-in-event-form",
-    createdAt: "1 day ago",
-    isPinned: false,
-    isWebhookCreated: false,
-    createdBy: {
-      id: "user-7",
-      name: "Melanie T.",
-      email: "melanie.t@example.org"
-    },
-    containers: [
-      {
-        id: "container-2-1",
-        moodleVersion: "5.0.2",
-        status: "provisioning",
-        url: "https://focused-cray.92-205-184-244.plesk.page/calendar-config/5.0.2/",
-        adminPassword: "Nx7$pQ2#mR5@jL8!",
-        createdAt: "Just now",
-        advancedConfig: {
-          database: "postgres15",
-          phpVersion: "8.2",
-          enableMLBackend: false,
-          additionalPlugins: []
-        }
-      }
-    ]
-  },
-  {
-    id: "env-3",
-    name: "design-doku-v5",
-    plugin: "theme_boost_union",
-    version: "v5.0-r8",
-    createdAt: "5 days ago",
-    isPinned: true,
-    isWebhookCreated: false,
-    createdBy: {
-      id: "user-1",
-      name: "Yvonne W.",
-      email: "yvonne.w@example.org"
-    },
-    containers: [
-      {
-        id: "container-3-1",
-        moodleVersion: "5.0.2",
-        status: "running",
-        url: "https://focused-cray.92-205-184-244.plesk.page/design-doku-v5/5.0.2/",
-        adminPassword: "Ym5$kL8#nR3@pB9!",
-        createdAt: "5 days ago",
-        advancedConfig: {
-          database: "postgres15",
-          phpVersion: "8.2",
-          enableMLBackend: false,
-          additionalPlugins: []
-        }
-      },
-      {
-        id: "container-3-2",
-        moodleVersion: "5.0.1",
-        status: "running",
-        url: "https://focused-cray.92-205-184-244.plesk.page/design-doku-v5/5.0.1/",
-        adminPassword: "Zk4$mN9#pL6@tB2!",
-        createdAt: "5 days ago",
-        advancedConfig: {
-          database: "postgres14",
-          phpVersion: "8.2",
-          enableMLBackend: false,
-          additionalPlugins: []
-        }
-      }
-    ]
-  },
-  {
-    id: "env-4",
-    name: "bookit-vadym",
-    plugin: "mod_bookit",
-    version: "PR#93",
-    createdAt: "6 hours ago",
-    isPinned: false,
-    isWebhookCreated: true,
-    pullRequestUrl: "https://github.com/melanietreitinger/mod_bookit/pull/93",
-    pullRequestNumber: 93,
-    createdBy: {
-      id: "webhook-system",
-      name: "GitHub Webhook",
-      email: "webhook@system.local"
-    },
-    containers: [
-      {
-        id: "container-4-1",
-        moodleVersion: "5.0.2",
-        status: "running",
-        url: "https://focused-cray.92-205-184-244.plesk.page/bookit-vadym/5.0.2/",
-        adminPassword: "Aq7$kR4#pL8@nB9!",
-        createdAt: "6 hours ago",
-        advancedConfig: {
-          database: "mariadb10.11",
-          phpVersion: "8.2",
-          enableMLBackend: false,
-          additionalPlugins: []
-        }
-      }
-    ]
-  },
-  {
-    id: "env-5",
-    name: "BU-aktuell-yw",
-    plugin: "theme_boost_union",
-    version: "main",
-    createdAt: "2 weeks ago",
-    isPinned: false,
-    isWebhookCreated: false,
-    createdBy: {
-      id: "user-1",
-      name: "Yvonne W.",
-      email: "yvonne.w@example.org"
-    },
-    containers: []
-  },
-  {
-    id: "env-6",
-    name: "course-header",
-    plugin: "theme_boost_union",
-    version: "issue-138",
-    createdAt: "30 minutes ago",
-    isPinned: false,
-    isWebhookCreated: false,
-    createdBy: {
-      id: "user-1",
-      name: "Yvonne W.",
-      email: "yvonne.w@example.org"
-    },
-    containers: [
-      {
-        id: "container-6-1",
-        moodleVersion: "5.0.2",
-        status: "provisioning",
-        url: "https://focused-cray.92-205-184-244.plesk.page/course-header/5.0.2/",
-        adminPassword: "Pk3$mV7#zX4@bC8!",
-        createdAt: "30 minutes ago",
-        advancedConfig: {
-          database: "mariadb10.11",
-          phpVersion: "8.2",
-          enableMLBackend: false,
-          additionalPlugins: []
-        }
-      }
-    ]
-  }
-];
+// mockEnvironments removed - real data comes from fetchInfrastructures()
 
 export default function App() {
   const auth = useAuth();
@@ -310,7 +112,7 @@ export default function App() {
   const [selectedTimeline, setSelectedTimeline] = useState<ProvisioningTimeline | null>(null);
   const [isTimelineModalOpen, setIsTimelineModalOpen] = useState(false);
   const [activeTimelines, setActiveTimelines] = useState<Map<string, ProvisioningTimeline>>(new Map());
-  const timelineRefs = useRef<Map<string, NodeJS.Timeout>>(new Map());
+  const timelineRefs = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   // Fetch real infrastructure data from the API
   useEffect(() => {
@@ -340,6 +142,17 @@ export default function App() {
     }, 4000);
     return () => clearInterval(interval);
   }, [hasProvisioningContainers]);
+
+  // Surface provisioning failures as toasts (once per environment).
+  const reportedErrorsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    environments.forEach(env => {
+      if (env.provisioningError && !reportedErrorsRef.current.has(env.id)) {
+        reportedErrorsRef.current.add(env.id);
+        toast.error(`Provisioning failed for "${env.name}": ${env.provisioningError}`);
+      }
+    });
+  }, [environments]);
 
   // Fetch plugin catalog from the API
   useEffect(() => {
@@ -849,7 +662,7 @@ export default function App() {
       });
   };
 
-  const handleAddContainer = (environmentId: string, moodleVersions: string[], advancedConfig?: any) => {
+  const handleAddContainer = (environmentId: string, _moodleVersions: string[], _advancedConfig?: any) => {
     // Open the modal instead of directly adding containers
     const env = environments.find(e => e.id === environmentId);
     if (!env) return;
@@ -1277,6 +1090,48 @@ export default function App() {
       });
   };
 
+  const handleUpdatePlugin = (
+    pluginId: string,
+    updates: Partial<Omit<Plugin, 'id' | 'createdAt' | 'updatedAt'>>
+  ) => {
+    const previous = plugins.find(p => p.id === pluginId);
+    if (!previous) return;
+
+    // Optimistic update
+    setPlugins(prev =>
+      prev.map(p =>
+        p.id === pluginId
+          ? { ...p, ...updates, updatedAt: new Date().toISOString() }
+          : p
+      )
+    );
+
+    apiUpdatePlugin(pluginId, updates)
+      .then((updated) => {
+        setPlugins(prev => prev.map(p => (p.id === pluginId ? updated : p)));
+        toast.success(`Plugin "${updated.displayName}" updated`);
+
+        if (auth.currentUser) {
+          auditLog.logActivity(
+            auth.currentUser.id,
+            `${auth.currentUser.firstName} ${auth.currentUser.lastName}`,
+            auth.currentUser.email,
+            'update',
+            'plugin',
+            { updatedFields: Object.keys(updates) },
+            updated.id,
+            updated.displayName
+          );
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to update plugin:", err);
+        // Revert
+        setPlugins(prev => prev.map(p => (p.id === pluginId ? previous : p)));
+        toast.error(`Failed to update plugin "${previous.displayName}"`);
+      });
+  };
+
   const simulateWebhookEnvironment = () => {
     const webhookPRNumber = Math.floor(Math.random() * 9000) + 1000;
     const webhookContainer: MoodleContainer = {
@@ -1480,6 +1335,7 @@ export default function App() {
             onTogglePluginActive={handleTogglePluginActive}
             onDeletePlugin={handleDeletePlugin}
             onAddPlugin={handleAddPlugin}
+            onUpdatePlugin={handleUpdatePlugin}
           />
         )}
 

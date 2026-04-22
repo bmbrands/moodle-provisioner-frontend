@@ -9,11 +9,13 @@ import { Switch } from "./ui/switch";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { Save, RotateCcw, Globe, GitPullRequest, AlertCircle, CheckCircle2, Settings, Package } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { PluginCatalogTable } from "./PluginCatalogTable";
 import { AddPluginModal } from "./AddPluginModal";
 import type { Plugin } from "../types/plugin";
+import { fetchSettings, updateSettings } from "../services/api";
+import type { SettingValue } from "../services/api";
 
 interface AdminSettingsModalProps {
   open: boolean;
@@ -23,6 +25,10 @@ interface AdminSettingsModalProps {
   onTogglePluginActive: (pluginId: string) => void;
   onDeletePlugin: (pluginId: string) => void;
   onAddPlugin: (plugin: Omit<Plugin, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  onUpdatePlugin?: (
+    pluginId: string,
+    updates: Partial<Omit<Plugin, 'id' | 'createdAt' | 'updatedAt'>>
+  ) => void;
 }
 
 interface ConfigItem {
@@ -169,11 +175,39 @@ export function AdminSettingsModal({
   plugins,
   onTogglePluginActive,
   onDeletePlugin,
-  onAddPlugin
+  onAddPlugin,
+  onUpdatePlugin
 }: AdminSettingsModalProps) {
   const [configs, setConfigs] = useState<ConfigItem[]>(mockConfigs);
   const [hasChanges, setHasChanges] = useState(false);
   const [isAddPluginModalOpen, setIsAddPluginModalOpen] = useState(false);
+  const [editingPlugin, setEditingPlugin] = useState<Plugin | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Load persisted overrides from backend on first open.
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    fetchSettings()
+      .then(overrides => {
+        if (cancelled) return;
+        if (!overrides || Object.keys(overrides).length === 0) return;
+        setConfigs(prev =>
+          prev.map(cfg =>
+            cfg.shortName in overrides
+              ? { ...cfg, value: overrides[cfg.shortName] as ConfigItem["value"] }
+              : cfg
+          )
+        );
+        setHasChanges(false);
+      })
+      .catch(err => {
+        console.error("Failed to load settings:", err);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
 
   const updateConfig = (shortName: string, newValue: string | number | boolean) => {
     setConfigs(prev => prev.map(config =>
@@ -184,15 +218,28 @@ export function AdminSettingsModal({
     setHasChanges(true);
   };
 
-  const handleSave = () => {
-    toast.success("Settings saved successfully!");
-    setHasChanges(false);
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      const values: Record<string, SettingValue> = Object.fromEntries(
+        configs.map(c => [c.shortName, c.value])
+      );
+      await updateSettings(values);
+      toast.success("Settings saved successfully!");
+      setHasChanges(false);
+    } catch (err) {
+      toast.error(
+        `Failed to save settings: ${err instanceof Error ? err.message : String(err)}`
+      );
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleReset = () => {
     setConfigs(mockConfigs);
-    setHasChanges(false);
-    toast.info("Settings reset to defaults");
+    setHasChanges(true);
+    toast.info("Settings reset to defaults — click Save to persist");
   };
 
   const renderConfigInput = (config: ConfigItem) => {
@@ -282,11 +329,11 @@ export function AdminSettingsModal({
                 <Button
                   size="sm"
                   onClick={handleSave}
-                  disabled={!hasChanges}
+                  disabled={!hasChanges || isSaving}
                   className="bg-success hover:bg-success/90 text-success-foreground"
                 >
                   <Save className="h-4 w-4 mr-2" />
-                  Save Changes
+                  {isSaving ? "Saving…" : "Save Changes"}
                 </Button>
               </div>
             </div>
@@ -438,7 +485,14 @@ export function AdminSettingsModal({
                   plugins={plugins}
                   onToggleActive={onTogglePluginActive}
                   onDeletePlugin={onDeletePlugin}
-                  onAddPlugin={() => setIsAddPluginModalOpen(true)}
+                  onAddPlugin={() => {
+                    setEditingPlugin(null);
+                    setIsAddPluginModalOpen(true);
+                  }}
+                  onEditPlugin={(plugin) => {
+                    setEditingPlugin(plugin);
+                    setIsAddPluginModalOpen(true);
+                  }}
                 />
               </div>
             </TabsContent>
@@ -448,8 +502,13 @@ export function AdminSettingsModal({
 
       <AddPluginModal
         open={isAddPluginModalOpen}
-        onOpenChange={setIsAddPluginModalOpen}
+        onOpenChange={(open) => {
+          setIsAddPluginModalOpen(open);
+          if (!open) setEditingPlugin(null);
+        }}
         onAddPlugin={onAddPlugin}
+        editingPlugin={editingPlugin}
+        onUpdatePlugin={onUpdatePlugin}
       />
     </>
   );
