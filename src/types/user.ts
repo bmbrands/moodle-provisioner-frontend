@@ -43,7 +43,6 @@ export const defaultRoles: Role[] = [
       { id: 'env-read', name: 'View Environments', resource: 'environments', action: 'read' },
       { id: 'env-write', name: 'Create/Edit Environments', resource: 'environments', action: 'write' },
       { id: 'env-delete', name: 'Delete Environments', resource: 'environments', action: 'delete' },
-      { id: 'metrics-read', name: 'View Host Metrics', resource: 'metrics', action: 'read' },
     ]
   },
   {
@@ -77,7 +76,7 @@ export const mockUsers: User[] = [
       createdAt: '2024-01-01',
       isActive: true
     },
-    roles: [defaultRoles[1]], // Admin
+    roles: [defaultRoles[0]], // Tester
     lastLoginAt: '2024-01-15T10:30:00Z',
     createdAt: '2024-01-01T00:00:00Z',
     isActive: true
@@ -96,7 +95,7 @@ export const mockUsers: User[] = [
       createdAt: '2024-01-01',
       isActive: true
     },
-    roles: [defaultRoles[1]], // Admin
+    roles: [defaultRoles[0]], // Tester
     lastLoginAt: '2024-01-15T09:45:00Z',
     createdAt: '2024-01-05T00:00:00Z',
     isActive: true

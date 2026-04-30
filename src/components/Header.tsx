@@ -18,9 +18,9 @@ interface HeaderProps {
   canViewAuditLog: boolean;
 }
 
-export function Header({ 
+export function Header({
   currentUser,
-  onOpenHostMetrics, 
+  onOpenHostMetrics,
   onOpenAdminSettings,
   onOpenUserManagement,
   onOpenAuditLog,
@@ -44,8 +44,8 @@ export function Header({
             </div>
             <nav className="flex items-center gap-4">
               {canViewMetrics && (
-                <Button 
-                  variant="ghost" 
+                <Button
+                  variant="ghost"
                   className="flex items-center gap-2 hover:bg-accent hover:text-accent-foreground"
                   onClick={onOpenHostMetrics}
                 >
@@ -54,8 +54,8 @@ export function Header({
                 </Button>
               )}
               {canManageUsers && (
-                <Button 
-                  variant="ghost" 
+                <Button
+                  variant="ghost"
                   className="flex items-center gap-2 hover:bg-accent hover:text-accent-foreground"
                   onClick={onOpenUserManagement}
                 >
@@ -64,8 +64,8 @@ export function Header({
                 </Button>
               )}
               {canViewAuditLog && (
-                <Button 
-                  variant="ghost" 
+                <Button
+                  variant="ghost"
                   className="flex items-center gap-2 hover:bg-accent hover:text-accent-foreground"
                   onClick={onOpenAuditLog}
                 >
@@ -74,8 +74,8 @@ export function Header({
                 </Button>
               )}
               {canAccessAdminSettings && (
-                <Button 
-                  variant="ghost" 
+                <Button
+                  variant="ghost"
                   className="flex items-center gap-2 hover:bg-accent hover:text-accent-foreground"
                   onClick={onOpenAdminSettings}
                 >
@@ -84,7 +84,7 @@ export function Header({
                 </Button>
               )}
               {currentUser && (
-                <UserAvatar 
+                <UserAvatar
                   user={currentUser}
                   onOpenProfile={onOpenUserProfile}
                   onLogout={onLogout}
