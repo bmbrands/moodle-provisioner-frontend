@@ -58,6 +58,13 @@ export function CreateEnvironmentModal({
   prefilledEnvironment
 }: CreateEnvironmentModalProps) {
   const [name, setName] = useState(prefilledEnvironment?.name || "");
+  // Docker Compose project names and nginx location paths only allow lowercase
+  // alphanumeric characters, hyphens, and underscores (no spaces, dots, or uppercase).
+  const NAME_PATTERN = /^[a-z0-9][a-z0-9_-]*$/;
+  const nameError =
+    name.length > 0 && !NAME_PATTERN.test(name)
+      ? "Only lowercase letters, numbers, hyphens and underscores are allowed (e.g. my-test-env)"
+      : null;
   const [selectedPluginId, setSelectedPluginId] = useState(() => {
     if (prefilledEnvironment?.plugin) {
       return plugins.find(p => p.name === prefilledEnvironment.plugin)?.id || "";
@@ -200,7 +207,7 @@ export function CreateEnvironmentModal({
       onOpenChange(false);
       return;
     }
-    if (name && selectedPluginId && version && moodleVersions.length > 0 && selectedPlugin) {
+    if (name && !nameError && selectedPluginId && version && moodleVersions.length > 0 && selectedPlugin) {
       const selectedVersion = availableVersions.find(v => v.ref === version);
       const versionType = selectedVersion?.type ?? "branch";
       const environment = {
@@ -254,7 +261,15 @@ export function CreateEnvironmentModal({
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
+                aria-invalid={!!nameError}
+                className={nameError ? "border-destructive focus-visible:ring-destructive" : ""}
               />
+              {nameError && (
+                <p className="text-sm text-destructive">{nameError}</p>
+              )}
+              {!nameError && name.length === 0 && (
+                <p className="text-sm text-muted-foreground">Only lowercase letters, numbers, hyphens and underscores (e.g. <code className="bg-muted px-1 rounded">my-test-env</code>)</p>
+              )}
             </div>
           )}
 
