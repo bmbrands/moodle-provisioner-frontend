@@ -325,6 +325,7 @@ export default function App() {
     try {
       await apiCreateInfrastructure({
         name: newEnv.name,
+        plugin: newEnv.plugin,
         git_ref_type: newEnv.versionType,
         git_ref: newEnv.version,
         moodle_versions: newEnv.moodleVersions,
@@ -1062,7 +1063,12 @@ export default function App() {
 
     apiCreatePlugin({ ...newPlugin, createdBy })
       .then((plugin) => {
-        setPlugins(prev => [...prev, plugin]);
+        // Re-fetch the authoritative catalog from the API so the new plugin
+        // (and any backend-side normalisation) is reflected in the list,
+        // falling back to an optimistic append if the refresh fails.
+        apiFetchPlugins()
+          .then(setPlugins)
+          .catch(() => setPlugins(prev => [...prev, plugin]));
         toast.success(`Plugin "${plugin.displayName}" added successfully`);
 
         // Log the activity

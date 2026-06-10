@@ -16,6 +16,7 @@ interface ApiInfrastructure {
   git_ref_type: string;
   git_ref_reference: string;
   created_at: string;
+  plugin?: string;
   moodles: ApiMoodleContainer[];
   provisioning_phase?: string | null;
   provisioning_error?: string | null;
@@ -54,7 +55,7 @@ function mapInfrastructureToEnvironment(infra: ApiInfrastructure): Environment {
   return {
     id: infra.name,
     name: infra.name,
-    plugin: "theme_boost_union",
+    plugin: infra.plugin || "boost_union",
     version: infra.git_ref_reference,
     createdAt: formatDate(infra.created_at),
     containers: infra.moodles.map((m, index) => ({
@@ -81,6 +82,7 @@ export async function fetchInfrastructures(): Promise<Environment[]> {
 
 export interface CreateInfrastructurePayload {
   name: string;
+  plugin: string;
   git_ref_type: "branch" | "tag" | "commit" | "pr";
   git_ref: string;
   moodle_versions: string[];
@@ -336,6 +338,41 @@ export async function postAuditEntry(payload: CreateAuditEntryDto): Promise<Audi
     throw new Error(`Failed to post audit entry: ${response.status} ${detail}`);
   }
   return response.json();
+}
+
+// ---- Server logs -------------------------------------------------------
+
+export interface ServerLogLine {
+  id: number;
+  timestamp: string;
+  level: string;
+  message: string;
+  source: string;
+}
+
+export async function fetchServerLogs(
+  limit = 1000,
+  afterId?: number
+): Promise<ServerLogLine[]> {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (afterId !== undefined) {
+    params.set("after_id", String(afterId));
+  }
+  const response = await fetch(`/api/logs?${params.toString()}`);
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`Failed to fetch server logs: ${response.status} ${detail}`);
+  }
+  const data: { lines: ServerLogLine[] } = await response.json();
+  return data.lines;
+}
+
+export async function clearServerLogs(): Promise<void> {
+  const response = await fetch("/api/logs", { method: "DELETE" });
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`Failed to clear server logs: ${response.status} ${detail}`);
+  }
 }
 
 // ---- Settings ----------------------------------------------------------

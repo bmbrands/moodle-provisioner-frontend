@@ -11,6 +11,8 @@ import { Separator } from "./ui/separator";
 import { Calendar } from "./ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { Checkbox } from "./ui/checkbox";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
+import { ServerLogsPanel } from "./ServerLogsPanel";
 import {
   FileText,
   Search,
@@ -24,7 +26,8 @@ import {
   Info,
   Shield,
   Eye,
-  EyeOff
+  EyeOff,
+  Terminal
 } from "lucide-react";
 import { useState, useMemo } from "react";
 // import { format } from "date-fns";
@@ -80,6 +83,7 @@ export function AuditLogModal({ open, onOpenChange, auditLogs, onExportLogs }: A
   const [showFilters, setShowFilters] = useState(false);
   const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date }>({});
   const [selectedEntry, setSelectedEntry] = useState<AuditLogEntry | null>(null);
+  const [activeTab, setActiveTab] = useState<"activity" | "server">("activity");
 
   const filteredLogs = useMemo(() => {
     return auditLogs.filter(log => {
@@ -183,7 +187,23 @@ export function AuditLogModal({ open, onOpenChange, auditLogs, onExportLogs }: A
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto">
+        <Tabs
+          value={activeTab}
+          onValueChange={(v) => setActiveTab(v as "activity" | "server")}
+          className="flex-1 overflow-hidden flex flex-col"
+        >
+          <TabsList className="flex-shrink-0">
+            <TabsTrigger value="activity" className="gap-2">
+              <Activity className="h-4 w-4" />
+              Activity Log
+            </TabsTrigger>
+            <TabsTrigger value="server" className="gap-2">
+              <Terminal className="h-4 w-4" />
+              Server Logs
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="activity" className="flex-1 overflow-y-auto mt-3">
           <div className="space-y-4">
           {/* Search and Filter Controls */}
           <div className="flex items-center justify-between gap-4">
@@ -550,7 +570,12 @@ export function AuditLogModal({ open, onOpenChange, auditLogs, onExportLogs }: A
             </Dialog>
           )}
         </div>
-        </div>
+        </TabsContent>
+
+          <TabsContent value="server" className="flex-1 overflow-y-auto mt-3">
+            <ServerLogsPanel active={open && activeTab === "server"} />
+          </TabsContent>
+        </Tabs>
       </DialogContent>
     </Dialog>
   );

@@ -76,7 +76,7 @@ export const mockUsers: User[] = [
       createdAt: '2024-01-01',
       isActive: true
     },
-    roles: [defaultRoles[0]], // Tester
+    roles: [defaultRoles[1]], // Admin
     lastLoginAt: '2024-01-15T10:30:00Z',
     createdAt: '2024-01-01T00:00:00Z',
     isActive: true
@@ -95,7 +95,7 @@ export const mockUsers: User[] = [
       createdAt: '2024-01-01',
       isActive: true
     },
-    roles: [defaultRoles[0]], // Tester
+    roles: [defaultRoles[1]], // Admin
     lastLoginAt: '2024-01-15T09:45:00Z',
     createdAt: '2024-01-05T00:00:00Z',
     isActive: true
