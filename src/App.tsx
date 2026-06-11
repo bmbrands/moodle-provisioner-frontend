@@ -19,14 +19,14 @@ import { AuditLogModal } from "./components/AuditLogModal";
 import { EnvironmentFiltersComponent, applyEnvironmentFilters, defaultFilters } from "./components/EnvironmentFilters";
 import type { EnvironmentFilters } from "./components/EnvironmentFilters";
 import { Header } from "./components/Header";
+import { LoginScreen } from "./components/LoginScreen";
 import { useAuth } from "./hooks/useAuth";
 import { useAuditLog } from "./hooks/useAuditLog";
-import { mockUsers } from "./types/user";
 import type { User } from "./types/user";
 import { mockPluginVersions } from "./types/plugin";
 import type { Plugin } from "./types/plugin";
 import { toast } from "sonner";
-import { fetchInfrastructures, startContainer as apiStartContainer, stopContainer as apiStopContainer, deleteContainer as apiDeleteContainer, deleteInfrastructure as apiDeleteInfrastructure, fetchPlugins as apiFetchPlugins, createPlugin as apiCreatePlugin, updatePlugin as apiUpdatePlugin, deletePlugin as apiDeletePlugin, createInfrastructure as apiCreateInfrastructure, addContainers as apiAddContainers } from "./services/api";
+import { fetchInfrastructures, startContainer as apiStartContainer, stopContainer as apiStopContainer, deleteContainer as apiDeleteContainer, deleteInfrastructure as apiDeleteInfrastructure, fetchPlugins as apiFetchPlugins, createPlugin as apiCreatePlugin, updatePlugin as apiUpdatePlugin, deletePlugin as apiDeletePlugin, createInfrastructure as apiCreateInfrastructure, addContainers as apiAddContainers, fetchUsers as apiFetchUsers, createUser as apiCreateUser, updateUser as apiUpdateUser, deleteUser as apiDeleteUser } from "./services/api";
 
 const generateDetailedEnvironment = (env: Environment): DetailedEnvironment => ({
   ...env,
@@ -93,7 +93,7 @@ export default function App() {
   const auth = useAuth();
   const auditLog = useAuditLog();
   const [environments, setEnvironments] = useState<Environment[]>([]);
-  const [users, setUsers] = useState<User[]>(mockUsers);
+  const [users, setUsers] = useState<User[]>([]);
   const [plugins, setPlugins] = useState<Plugin[]>([]);
   const [filters, setFilters] = useState<EnvironmentFilters>(defaultFilters);
   const [isLoading, setIsLoading] = useState(true);
@@ -163,6 +163,20 @@ export default function App() {
         toast.error("Failed to load plugin catalog from API");
       });
   }, []);
+
+  // Load the user directory from the API once an admin is authenticated.
+  useEffect(() => {
+    if (!auth.isAuthenticated || !auth.canManageUsers) {
+      setUsers([]);
+      return;
+    }
+    apiFetchUsers()
+      .then(setUsers)
+      .catch((err) => {
+        console.error("Failed to fetch users:", err);
+        toast.error("Failed to load users from API");
+      });
+  }, [auth.isAuthenticated, auth.canManageUsers]);
 
   // Apply filters to get filtered environments
   const filteredEnvironments = useMemo(() => {
@@ -864,94 +878,116 @@ export default function App() {
   };
 
   // User Management Handlers
-  const handleUpdateUser = (updatedUser: User) => {
+  const handleUpdateUser = async (updatedUser: User) => {
     const originalUser = users.find(u => u.id === updatedUser.id);
+    try {
+      const saved = await apiUpdateUser(updatedUser.id, {
+        first_name: updatedUser.firstName,
+        last_name: updatedUser.lastName,
+        email: updatedUser.email,
+        roles: updatedUser.roles.map(r => r.id),
+        is_active: updatedUser.isActive,
+        avatar: updatedUser.avatar,
+      });
 
-    setUsers(prev => prev.map(user => user.id === updatedUser.id ? updatedUser : user));
-    if (auth.currentUser && auth.currentUser.id === updatedUser.id) {
-      auth.updateCurrentUser(updatedUser);
+      setUsers(prev => prev.map(user => (user.id === saved.id ? saved : user)));
+      if (auth.currentUser && auth.currentUser.id === saved.id) {
+        auth.updateCurrentUser(saved);
+      }
+
+      if (auth.currentUser && originalUser) {
+        auditLog.logActivity(
+          auth.currentUser.id,
+          `${auth.currentUser.firstName} ${auth.currentUser.lastName}`,
+          auth.currentUser.email,
+          'update',
+          'user',
+          {
+            changes: {
+              email: originalUser.email !== saved.email ? { from: originalUser.email, to: saved.email } : undefined,
+              roles: originalUser.roles !== saved.roles ? {
+                from: originalUser.roles.map(r => r.name),
+                to: saved.roles.map(r => r.name)
+              } : undefined
+            }
+          },
+          saved.id,
+          `${saved.firstName} ${saved.lastName}`
+        );
+      }
+
+      toast.success("User updated successfully!");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to update user");
     }
-
-    // Log the activity
-    if (auth.currentUser && originalUser) {
-      auditLog.logActivity(
-        auth.currentUser.id,
-        `${auth.currentUser.firstName} ${auth.currentUser.lastName}`,
-        auth.currentUser.email,
-        'update',
-        'user',
-        {
-          changes: {
-            email: originalUser.email !== updatedUser.email ? { from: originalUser.email, to: updatedUser.email } : undefined,
-            roles: originalUser.roles !== updatedUser.roles ? {
-              from: originalUser.roles.map(r => r.name),
-              to: updatedUser.roles.map(r => r.name)
-            } : undefined
-          }
-        },
-        updatedUser.id,
-        `${updatedUser.firstName} ${updatedUser.lastName}`
-      );
-    }
-
-    toast.success("User updated successfully!");
   };
 
-  const handleDeleteUser = (userId: string) => {
+  const handleDeleteUser = async (userId: string) => {
     const user = users.find(u => u.id === userId);
+    try {
+      await apiDeleteUser(userId);
 
-    // Log the activity
-    if (auth.currentUser && user) {
-      auditLog.logActivity(
-        auth.currentUser.id,
-        `${auth.currentUser.firstName} ${auth.currentUser.lastName}`,
-        auth.currentUser.email,
-        'delete',
-        'user',
-        {
-          deletedUserEmail: user.email,
-          deletedUserRoles: user.roles.map(r => r.name)
-        },
-        userId,
-        `${user.firstName} ${user.lastName}`
-      );
+      if (auth.currentUser && user) {
+        auditLog.logActivity(
+          auth.currentUser.id,
+          `${auth.currentUser.firstName} ${auth.currentUser.lastName}`,
+          auth.currentUser.email,
+          'delete',
+          'user',
+          {
+            deletedUserEmail: user.email,
+            deletedUserRoles: user.roles.map(r => r.name)
+          },
+          userId,
+          `${user.firstName} ${user.lastName}`
+        );
+      }
+
+      setUsers(prev => prev.filter(u => u.id !== userId));
+      toast.success(`User "${user?.firstName} ${user?.lastName}" deleted successfully!`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to delete user");
     }
-
-    setUsers(prev => prev.filter(user => user.id !== userId));
-    toast.success(`User "${user?.firstName} ${user?.lastName}" deleted successfully!`);
   };
 
-  const handleCreateUser = (newUser: Omit<User, 'id' | 'createdAt' | 'lastLoginAt'>) => {
-    const user: User = {
-      ...newUser,
-      id: `user-${Date.now()}`,
-      createdAt: new Date().toISOString(),
-      lastLoginAt: new Date().toISOString()
-    };
+  const handleCreateUser = async (
+    newUser: Omit<User, 'id' | 'createdAt' | 'lastLoginAt'> & { password: string }
+  ) => {
+    try {
+      const created = await apiCreateUser({
+        email: newUser.email,
+        first_name: newUser.firstName,
+        last_name: newUser.lastName,
+        password: newUser.password,
+        roles: newUser.roles.map(r => r.id),
+        avatar: newUser.avatar,
+      });
 
-    // Log the activity
-    if (auth.currentUser) {
-      auditLog.logActivity(
-        auth.currentUser.id,
-        `${auth.currentUser.firstName} ${auth.currentUser.lastName}`,
-        auth.currentUser.email,
-        'create',
-        'user',
-        {
-          email: user.email,
-          roles: user.roles.map(r => r.name)
-        },
-        user.id,
-        `${user.firstName} ${user.lastName}`
-      );
+      if (auth.currentUser) {
+        auditLog.logActivity(
+          auth.currentUser.id,
+          `${auth.currentUser.firstName} ${auth.currentUser.lastName}`,
+          auth.currentUser.email,
+          'create',
+          'user',
+          {
+            email: created.email,
+            roles: created.roles.map(r => r.name)
+          },
+          created.id,
+          `${created.firstName} ${created.lastName}`
+        );
+      }
+
+      setUsers(prev => [...prev, created]);
+      toast.success("User created successfully!");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to create user");
     }
-
-    setUsers(prev => [...prev, user]);
-    toast.success("User created successfully!");
   };
 
-  const handleLogout = () => {
-    // Log the activity
+  const handleLogout = async () => {
+    // Log the activity before the session is cleared.
     if (auth.currentUser) {
       auditLog.logActivity(
         auth.currentUser.id,
@@ -963,7 +999,7 @@ export default function App() {
       );
     }
 
-    auth.logout();
+    await auth.logout();
     toast.info("Logged out successfully");
   };
 
@@ -1199,6 +1235,33 @@ export default function App() {
     // Start the provisioning simulation
     simulateProvisioningStep(webhookContainer.id, 0);
   };
+
+  // --- Authentication gate -------------------------------------------------
+  // While the session is being resolved, show a minimal loading state.
+  if (auth.isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="text-muted-foreground">Loading…</div>
+      </div>
+    );
+  }
+
+  // Not signed in, or signed in but required to change the password: show the
+  // login / forced-password-change screen instead of the app.
+  if (!auth.isAuthenticated || auth.mustChangePassword) {
+    return (
+      <LoginScreen
+        onLogin={async (email, password) => {
+          await auth.login(email, password);
+        }}
+        mustChangePassword={auth.isAuthenticated && auth.mustChangePassword}
+        onChangePassword={async (currentPassword, newPassword) => {
+          await auth.changePassword(currentPassword, newPassword);
+          toast.success("Password changed successfully");
+        }}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background p-6">

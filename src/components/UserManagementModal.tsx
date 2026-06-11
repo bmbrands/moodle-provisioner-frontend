@@ -22,7 +22,7 @@ interface UserManagementModalProps {
   users: User[];
   onUpdateUser: (user: User) => void;
   onDeleteUser: (userId: string) => void;
-  onCreateUser: (user: Omit<User, 'id' | 'createdAt' | 'lastLoginAt'>) => void;
+  onCreateUser: (user: Omit<User, 'id' | 'createdAt' | 'lastLoginAt'> & { password: string }) => void;
 }
 
 export function UserManagementModal({
@@ -41,11 +41,12 @@ export function UserManagementModal({
     firstName: "",
     lastName: "",
     accountId: "",
+    password: "",
     roles: [] as Role[],
     isActive: true
   });
 
-  const filteredUsers = users.filter(user =>
+  const filteredUsers = (Array.isArray(users) ? users : []).filter(user =>
     user.firstName.toLowerCase().includes(searchQuery.toLowerCase()) ||
     user.lastName.toLowerCase().includes(searchQuery.toLowerCase()) ||
     user.email.toLowerCase().includes(searchQuery.toLowerCase())
@@ -56,14 +57,26 @@ export function UserManagementModal({
   };
 
   const handleCreateUser = () => {
-    if (!newUser.email || !newUser.firstName || !newUser.lastName || !newUser.accountId || newUser.roles.length === 0) {
+    if (!newUser.email || !newUser.firstName || !newUser.lastName || newUser.roles.length === 0) {
       toast.error("Please fill in all required fields");
       return;
     }
+    if (newUser.password.length < 8) {
+      toast.error("Password must be at least 8 characters long");
+      return;
+    }
 
+    const account = users[0]?.account;
     onCreateUser({
       ...newUser,
-      account: users[0].account, // Mock account for now
+      accountId: account?.id ?? newUser.accountId,
+      account: account ?? {
+        id: "account-default",
+        name: "Boost Union",
+        domain: "localhost",
+        createdAt: new Date().toISOString(),
+        isActive: true,
+      },
     });
 
     setNewUser({
@@ -71,11 +84,11 @@ export function UserManagementModal({
       firstName: "",
       lastName: "",
       accountId: "",
+      password: "",
       roles: [],
       isActive: true
     });
     setIsCreateUserOpen(false);
-    toast.success("User created successfully!");
   };
 
   const toggleUserRole = (user: User, role: Role) => {
@@ -170,6 +183,20 @@ export function UserManagementModal({
                       onChange={(e) => setNewUser(prev => ({ ...prev, email: e.target.value }))}
                       placeholder="john.doe@example.com"
                     />
+                  </div>
+                  <div>
+                    <Label htmlFor="password">Temporary Password</Label>
+                    <Input
+                      id="password"
+                      type="password"
+                      value={newUser.password}
+                      onChange={(e) => setNewUser(prev => ({ ...prev, password: e.target.value }))}
+                      placeholder="At least 8 characters"
+                      autoComplete="new-password"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      The user will be required to change this on first sign-in.
+                    </p>
                   </div>
                   <div>
                     <Label htmlFor="role">Role</Label>

@@ -1,70 +1,93 @@
-import { useState, useCallback, useMemo } from 'react';
-import type { User, Permission } from '../types/user';
-import { mockUsers } from '../types/user';
+import { useState, useCallback, useMemo, useEffect } from 'react';
+import type { User } from '../types/user';
+import * as api from '../services/api';
 
 export function useAuth() {
-  const [currentUser, setCurrentUser] = useState<User | null>(mockUsers[0]); // Default to admin user
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const login = useCallback((email: string, password: string) => {
-    // Mock login - in real app would call API
-    const user = mockUsers.find(u => u.email === email);
-    if (user) {
-      setCurrentUser(user);
-      return true;
+  // On mount, ask the backend who we are (relies on the HTTP-only session cookie).
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const user = await api.fetchCurrentUser();
+        if (!cancelled) setCurrentUser(user);
+      } catch {
+        if (!cancelled) setCurrentUser(null);
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const login = useCallback(async (email: string, password: string): Promise<User> => {
+    const user = await api.login(email, password);
+    setCurrentUser(user);
+    return user;
+  }, []);
+
+  const logout = useCallback(async () => {
+    try {
+      await api.logout();
+    } finally {
+      setCurrentUser(null);
     }
-    return false;
   }, []);
 
-  const logout = useCallback(() => {
-    setCurrentUser(null);
-  }, []);
+  const changePassword = useCallback(
+    async (currentPassword: string, newPassword: string): Promise<User> => {
+      const user = await api.changePassword(currentPassword, newPassword);
+      setCurrentUser(user);
+      return user;
+    },
+    []
+  );
 
+  // Apply a locally-known user update (e.g. after a profile edit through the API).
   const updateCurrentUser = useCallback((updatedUser: User) => {
     setCurrentUser(updatedUser);
   }, []);
 
-  const hasPermission = useCallback((resource: string, action: string) => {
-    if (!currentUser) return false;
-    
-    return currentUser.roles.some(role =>
-      role.permissions.some(permission =>
-        permission.resource === resource && permission.action === action
-      )
-    );
-  }, [currentUser]);
+  const hasPermission = useCallback(
+    (resource: string, action: string) => {
+      if (!currentUser) return false;
+      return currentUser.roles.some(role =>
+        role.permissions.some(
+          permission => permission.resource === resource && permission.action === action
+        )
+      );
+    },
+    [currentUser]
+  );
 
   const isAdmin = useMemo(() => {
     return currentUser?.roles.some(role => role.id === 'admin') ?? false;
   }, [currentUser]);
 
-  const canAccessAdminSettings = useMemo(() => {
-    return hasPermission('system', 'admin');
-  }, [hasPermission]);
-
-  const canManageUsers = useMemo(() => {
-    return hasPermission('users', 'admin');
-  }, [hasPermission]);
-
-  const canViewMetrics = useMemo(() => {
-    return hasPermission('metrics', 'read');
-  }, [hasPermission]);
-
-  const canCreateEnvironments = useMemo(() => {
-    return hasPermission('environments', 'write');
-  }, [hasPermission]);
-
-  const canDeleteEnvironments = useMemo(() => {
-    return hasPermission('environments', 'delete');
-  }, [hasPermission]);
-
-  const canViewAuditLog = useMemo(() => {
-    return hasPermission('audit', 'read');
-  }, [hasPermission]);
+  const canAccessAdminSettings = useMemo(() => hasPermission('system', 'admin'), [hasPermission]);
+  const canManageUsers = useMemo(() => hasPermission('users', 'admin'), [hasPermission]);
+  const canViewMetrics = useMemo(() => hasPermission('metrics', 'read'), [hasPermission]);
+  const canCreateEnvironments = useMemo(
+    () => hasPermission('environments', 'write'),
+    [hasPermission]
+  );
+  const canDeleteEnvironments = useMemo(
+    () => hasPermission('environments', 'delete'),
+    [hasPermission]
+  );
+  const canViewAuditLog = useMemo(() => hasPermission('audit', 'read'), [hasPermission]);
 
   return {
     currentUser,
+    isLoading,
+    mustChangePassword: currentUser?.mustChangePassword ?? false,
     login,
     logout,
+    changePassword,
     updateCurrentUser,
     hasPermission,
     isAdmin,
@@ -74,6 +97,6 @@ export function useAuth() {
     canCreateEnvironments,
     canDeleteEnvironments,
     canViewAuditLog,
-    isAuthenticated: !!currentUser
+    isAuthenticated: !!currentUser,
   };
 }

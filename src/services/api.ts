@@ -1,5 +1,6 @@
 import type { Environment, MoodleContainer } from "../components/EnvironmentsTable";
 import type { Plugin, PluginVersion } from "../types/plugin";
+import type { User, Role } from "../types/user";
 
 interface ApiMoodleContainer {
   moodle_version: string;
@@ -18,6 +19,7 @@ interface ApiInfrastructure {
   created_at: string;
   plugin?: string;
   moodles: ApiMoodleContainer[];
+  created_by?: { id: string; name: string; email: string } | null;
   provisioning_phase?: string | null;
   provisioning_error?: string | null;
 }
@@ -68,6 +70,15 @@ function mapInfrastructureToEnvironment(infra: ApiInfrastructure): Environment {
     })),
     ...(phase ? { provisioningPhase: phase } : {}),
     ...(infra.provisioning_error ? { provisioningError: infra.provisioning_error } : {}),
+    ...(infra.created_by
+      ? {
+          createdBy: {
+            id: infra.created_by.id,
+            name: infra.created_by.name,
+            email: infra.created_by.email,
+          },
+        }
+      : {}),
   };
 }
 
@@ -403,4 +414,161 @@ export async function updateSettings(
   }
   const data: { values: Record<string, SettingValue> } = await response.json();
   return data.values ?? {};
+}
+
+// ---------------------------------------------------------------------------
+// Authentication & user management
+// ---------------------------------------------------------------------------
+
+/** Raised on a 401 so callers can distinguish "not logged in" from real errors. */
+export class UnauthorizedError extends Error {
+  constructor(message = "Unauthorized") {
+    super(message);
+    this.name = "UnauthorizedError";
+  }
+}
+
+async function readErrorDetail(response: Response): Promise<string> {
+  let detail = await response.text();
+  try {
+    const parsed = JSON.parse(detail);
+    if (parsed && parsed.detail) detail = parsed.detail;
+  } catch {
+    // keep raw text
+  }
+  return detail;
+}
+
+/** Fetch the currently authenticated user, or `null` if not logged in. */
+export async function fetchCurrentUser(): Promise<User | null> {
+  const response = await fetch("/api/auth/me", { credentials: "include" });
+  if (response.status === 401) return null;
+  if (!response.ok) {
+    throw new Error(`Failed to load current user: ${response.status}`);
+  }
+  return (await response.json()) as User;
+}
+
+/** Authenticate with email + password. Returns the logged-in user. */
+export async function login(email: string, password: string): Promise<User> {
+  const response = await fetch("/api/auth/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ email, password }),
+  });
+  if (response.status === 401) {
+    throw new UnauthorizedError("Invalid email or password");
+  }
+  if (response.status === 429) {
+    throw new Error("Too many failed attempts. Please wait a minute and try again.");
+  }
+  if (!response.ok) {
+    throw new Error(`Login failed: ${response.status} ${await readErrorDetail(response)}`);
+  }
+  return (await response.json()) as User;
+}
+
+/** End the current session. */
+export async function logout(): Promise<void> {
+  await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
+}
+
+/** Change the current user's password. Returns the refreshed user record. */
+export async function changePassword(
+  currentPassword: string,
+  newPassword: string
+): Promise<User> {
+  const response = await fetch("/api/auth/change-password", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+  });
+  if (response.status === 401) {
+    throw new UnauthorizedError();
+  }
+  if (!response.ok) {
+    throw new Error(await readErrorDetail(response));
+  }
+  return (await response.json()) as User;
+}
+
+/** List all users (admin only). */
+export async function fetchUsers(): Promise<User[]> {
+  const response = await fetch("/api/users", { credentials: "include" });
+  if (response.status === 401) throw new UnauthorizedError();
+  if (!response.ok) {
+    throw new Error(`Failed to fetch users: ${response.status}`);
+  }
+  const data = (await response.json()) as { users: User[] };
+  return data.users ?? [];
+}
+
+export interface CreateUserPayload {
+  email: string;
+  first_name: string;
+  last_name: string;
+  password: string;
+  roles: string[];
+  avatar?: string;
+}
+
+/** Create a new user (admin only). */
+export async function createUser(payload: CreateUserPayload): Promise<User> {
+  const response = await fetch("/api/users", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    throw new Error(await readErrorDetail(response));
+  }
+  return (await response.json()) as User;
+}
+
+export interface UpdateUserPayload {
+  first_name?: string;
+  last_name?: string;
+  email?: string;
+  roles?: string[];
+  is_active?: boolean;
+  avatar?: string;
+  password?: string;
+}
+
+/** Update an existing user (admin only). */
+export async function updateUser(userId: string, payload: UpdateUserPayload): Promise<User> {
+  const response = await fetch(`/api/users/${encodeURIComponent(userId)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    throw new Error(await readErrorDetail(response));
+  }
+  return (await response.json()) as User;
+}
+
+/** Delete a user (admin only). */
+export async function deleteUser(userId: string): Promise<void> {
+  const response = await fetch(`/api/users/${encodeURIComponent(userId)}`, {
+    method: "DELETE",
+    credentials: "include",
+  });
+  if (!response.ok) {
+    throw new Error(await readErrorDetail(response));
+  }
+}
+
+/** Fetch the available roles (admin only). */
+export async function fetchRoles(): Promise<Role[]> {
+  const response = await fetch("/api/users/roles", { credentials: "include" });
+  if (!response.ok) {
+    throw new Error(`Failed to fetch roles: ${response.status}`);
+  }
+  const data = (await response.json()) as { roles: Role[] };
+  return data.roles ?? [];
 }
