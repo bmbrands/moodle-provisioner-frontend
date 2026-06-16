@@ -8,7 +8,7 @@ import { Play, Square, Trash2, MoreHorizontal, Copy, ExternalLink, Settings, Dow
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 import { toast } from "sonner";
 
-import type { Plugin, PluginVersion } from "../types/plugin";
+import type { Plugin } from "../types/plugin";
 
 export interface MoodleContainer {
   id: string;
@@ -30,6 +30,7 @@ export interface Environment {
   name: string;
   plugin: string;
   version: string;
+  versionType?: "branch" | "tag" | "pr" | "commit";
   containers: MoodleContainer[];
   isPinned?: boolean;
   isWebhookCreated?: boolean;
@@ -47,56 +48,40 @@ export interface Environment {
   provisioningError?: string;
 }
 
-const getVersionUrl = (plugin: Plugin | undefined, version: string, pluginVersions: Record<string, PluginVersion[]>) => {
-  if (!plugin) return null;
-  for (const [pluginId, versions] of Object.entries(pluginVersions)) {
-    if (pluginId === plugin.id || (plugin.name === versions[0]?.name?.split('/')[0])) {
-      const versionInfo = versions.find(v => v.ref === version);
-      if (versionInfo) {
-        const repoUrl = plugin.repositoryUrl;
-        switch (versionInfo.type) {
-          case "branch":
-            return `${repoUrl}/tree/${version}`;
-          case "tag":
-            return `${repoUrl}/releases/tag/${version}`;
-          case "pr":
-            const prNumber = version.replace(/^PR#/, '');
-            return `${repoUrl}/pull/${prNumber}`;
-          default:
-            return null;
-        }
-      }
+const getVersionUrl = (plugin: Plugin | undefined, version: string, versionType: Environment["versionType"]) => {
+  if (!plugin?.repositoryUrl || !versionType) return null;
+  const repoUrl = plugin.repositoryUrl;
+  switch (versionType) {
+    case "branch":
+      return `${repoUrl}/tree/${version}`;
+    case "tag":
+      return `${repoUrl}/releases/tag/${version}`;
+    case "pr": {
+      const prNumber = version.replace(/^PR#/, '');
+      return `${repoUrl}/pull/${prNumber}`;
     }
+    default:
+      return null;
   }
-  return null;
 };
 
-const getVersionIcon = (plugin: Plugin | undefined, version: string, pluginVersions: Record<string, PluginVersion[]>) => {
-  if (!plugin) return null;
-  for (const [pluginId, versions] of Object.entries(pluginVersions)) {
-    if (pluginId === plugin.id || (plugin.name === versions[0]?.name?.split('/')[0])) {
-      const versionInfo = versions.find(v => v.ref === version);
-      if (versionInfo) {
-        switch (versionInfo.type) {
-          case "branch":
-            return <GitBranch className="h-4 w-4 text-info" />;
-          case "tag":
-            return <Tag className="h-4 w-4 text-success" />;
-          case "pr":
-            return <GitPullRequest className="h-4 w-4 text-warning" />;
-          default:
-            return null;
-        }
-      }
-    }
+const getVersionIcon = (plugin: Plugin | undefined, versionType: Environment["versionType"]) => {
+  if (!plugin || !versionType) return null;
+  switch (versionType) {
+    case "branch":
+      return <GitBranch className="h-4 w-4 text-info" />;
+    case "tag":
+      return <Tag className="h-4 w-4 text-success" />;
+    case "pr":
+      return <GitPullRequest className="h-4 w-4 text-warning" />;
+    default:
+      return null;
   }
-  return null;
 };
 
 interface EnvironmentsTableProps {
   environments: Environment[];
   plugins: Plugin[];
-  pluginVersions: Record<string, PluginVersion[]>;
   onStartContainer: (environmentId: string, containerId: string) => void;
   onStopContainer: (environmentId: string, containerId: string) => void;
   onDeleteContainer: (environmentId: string, containerId: string) => void;
@@ -109,7 +94,6 @@ interface EnvironmentsTableProps {
 export function EnvironmentsTable({
   environments,
   plugins,
-  pluginVersions,
   onStartContainer,
   onStopContainer,
   onDeleteContainer,
@@ -539,10 +523,10 @@ export function EnvironmentsTable({
                           );
                         })()}
                         <div className="flex items-center gap-2">
-                          {getVersionIcon(plugins.find(p => p.name === env.plugin), env.version, pluginVersions)}
+                          {getVersionIcon(plugins.find(p => p.name === env.plugin), env.versionType)}
                           {(() => {
                             const plugin = plugins.find(p => p.name === env.plugin);
-                            const versionUrl = getVersionUrl(plugin, env.version, pluginVersions);
+                            const versionUrl = getVersionUrl(plugin, env.version, env.versionType);
                             return versionUrl ? (
                               <a
                                 href={versionUrl}

@@ -20,7 +20,6 @@ interface CreateEnvironmentModalProps {
     moodleVersions: string[];
   }) => void;
   plugins: Plugin[];
-  pluginVersions: Record<string, PluginVersion[]>;
   // Add Container mode props
   isAddContainerMode?: boolean;
   prefilledEnvironment?: {
@@ -48,7 +47,6 @@ export function CreateEnvironmentModal({
   onOpenChange,
   onCreateEnvironment,
   plugins,
-  pluginVersions,
   isAddContainerMode = false,
   prefilledEnvironment
 }: CreateEnvironmentModalProps) {
@@ -117,8 +115,8 @@ export function CreateEnvironmentModal({
       return;
     }
     const plugin = plugins.find(p => p.id === selectedPluginId);
-    // Prefer freshly fetched refs; fall back to whatever the parent passed in.
-    const fallback = pluginVersions[selectedPluginId] || [];
+    // Prefer freshly fetched refs; fall back to an empty list on failure.
+    const fallback: PluginVersion[] = [];
     if (!plugin?.repositoryUrl) {
       setAvailableVersions(fallback);
       setVersionsError(null);
@@ -144,7 +142,7 @@ export function CreateEnvironmentModal({
     return () => {
       cancelled = true;
     };
-  }, [selectedPluginId, plugins, pluginVersions]);
+  }, [selectedPluginId, plugins]);
 
   // Get the selected plugin object
   const selectedPlugin = useMemo(() =>

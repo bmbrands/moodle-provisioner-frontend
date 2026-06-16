@@ -57,6 +57,7 @@ function mapInfrastructureToEnvironment(infra: ApiInfrastructure): Environment {
     name: infra.name,
     plugin: infra.plugin || "boost_union",
     version: infra.git_ref_reference,
+    versionType: infra.git_ref_type as Environment["versionType"],
     createdAt: formatDate(infra.created_at),
     containers: infra.moodles.map((m, index) => ({
       id: `${infra.name}-${m.moodle_version}-${index}`,

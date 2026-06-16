@@ -12,7 +12,6 @@ import type { EnvironmentFilters } from "./components/EnvironmentFilters";
 import { Header } from "./components/Header";
 import { useAuth } from "./hooks/useAuth";
 import { useAuditLog } from "./hooks/useAuditLog";
-import { mockPluginVersions } from "./types/plugin";
 import type { Plugin } from "./types/plugin";
 import { toast } from "sonner";
 import { fetchInfrastructures, startContainer as apiStartContainer, stopContainer as apiStopContainer, deleteContainer as apiDeleteContainer, deleteInfrastructure as apiDeleteInfrastructure, fetchPlugins as apiFetchPlugins, createPlugin as apiCreatePlugin, updatePlugin as apiUpdatePlugin, deletePlugin as apiDeletePlugin, createInfrastructure as apiCreateInfrastructure, addContainers as apiAddContainers } from "./services/api";
@@ -788,7 +787,6 @@ export default function App() {
             <EnvironmentsTable
               environments={filteredEnvironments}
               plugins={plugins}
-              pluginVersions={mockPluginVersions}
               onStartContainer={handleStartContainer}
               onStopContainer={handleStopContainer}
               onDeleteContainer={handleDeleteContainer}
@@ -807,7 +805,6 @@ export default function App() {
           onOpenChange={setIsCreateModalOpen}
           onCreateEnvironment={handleCreateEnvironment}
           plugins={plugins}
-          pluginVersions={mockPluginVersions}
         />
 
         {/* Add Container Modal */}
@@ -821,7 +818,6 @@ export default function App() {
           }}
           onCreateEnvironment={handleCreateContainer}
           plugins={plugins}
-          pluginVersions={mockPluginVersions}
           isAddContainerMode={true}
           prefilledEnvironment={addContainerEnvironment ? {
             name: addContainerEnvironment.name,
