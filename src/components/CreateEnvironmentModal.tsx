@@ -6,8 +6,6 @@ import { Label } from "./ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Badge } from "./ui/badge";
 import { Checkbox } from "./ui/checkbox";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "./ui/collapsible";
-import { ChevronDown, ChevronRight, Plus, X } from "lucide-react";
 import type { Plugin, PluginVersion } from "../types/plugin";
 import { fetchPluginVersions, fetchMoodleVersions } from "../services/api";
 
@@ -20,9 +18,6 @@ interface CreateEnvironmentModalProps {
     version: string;
     versionType: "branch" | "tag" | "pr" | "commit";
     moodleVersions: string[];
-    advancedConfig?: {
-      additionalPlugins: string[];
-    };
   }) => void;
   plugins: Plugin[];
   pluginVersions: Record<string, PluginVersion[]>;
@@ -73,11 +68,6 @@ export function CreateEnvironmentModal({
   });
   const [version, setVersion] = useState(prefilledEnvironment?.version || "");
   const [moodleVersions, setMoodleVersions] = useState<string[]>([]);
-
-  // Advanced settings state
-  const [showAdvanced, setShowAdvanced] = useState(false);
-  const [additionalPlugins, setAdditionalPlugins] = useState<string[]>([]);
-  const [newPluginInput, setNewPluginInput] = useState("");
 
   // Available Moodle versions, fetched live from the backend (which pulls
   // them from tags on moodle/moodle) with a static fallback.
@@ -168,17 +158,6 @@ export function CreateEnvironmentModal({
     setVersion(""); // Reset version selection when plugin changes
   };
 
-  const handleAddPlugin = () => {
-    if (newPluginInput.trim() && !additionalPlugins.includes(newPluginInput.trim())) {
-      setAdditionalPlugins(prev => [...prev, newPluginInput.trim()]);
-      setNewPluginInput("");
-    }
-  };
-
-  const handleRemovePlugin = (pluginToRemove: string) => {
-    setAdditionalPlugins(prev => prev.filter(plugin => plugin !== pluginToRemove));
-  };
-
   const handleMoodleVersionToggle = (version: string) => {
     setMoodleVersions(prev => {
       if (prev.includes(version)) {
@@ -216,11 +195,6 @@ export function CreateEnvironmentModal({
         version,
         versionType,
         moodleVersions,
-        ...(showAdvanced && {
-          advancedConfig: {
-            additionalPlugins
-          }
-        })
       };
 
       onCreateEnvironment(environment);
@@ -230,9 +204,6 @@ export function CreateEnvironmentModal({
       setSelectedPluginId("");
       setVersion("");
       setMoodleVersions([]);
-      setShowAdvanced(false);
-      setAdditionalPlugins([]);
-      setNewPluginInput("");
       onOpenChange(false);
     }
   };
@@ -377,32 +348,10 @@ export function CreateEnvironmentModal({
 
           <div className="space-y-2">
             <Label htmlFor="moodle-version-select">
-              Moodle Version{(showAdvanced && !isAddContainerMode) || isAddContainerMode ? 's' : ''}
-              {((showAdvanced && !isAddContainerMode) || isAddContainerMode) && <span className="text-sm text-muted-foreground ml-1">(select multiple)</span>}
+              Moodle Version{isAddContainerMode ? 's' : ''}
+              {isAddContainerMode && <span className="text-sm text-muted-foreground ml-1">(select multiple)</span>}
             </Label>
-            {showAdvanced && !isAddContainerMode ? (
-              <div className="space-y-2">
-                <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto border rounded-md p-3">
-                  {availableMoodleVersions.map((mv) => (
-                    <div key={mv} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`moodle-${mv}`}
-                        checked={moodleVersions.includes(mv)}
-                        onCheckedChange={() => handleMoodleVersionToggle(mv)}
-                      />
-                      <Label htmlFor={`moodle-${mv}`} className="text-sm cursor-pointer">
-                        {mv}
-                      </Label>
-                    </div>
-                  ))}
-                </div>
-                {moodleVersions.length > 0 && (
-                  <div className="text-sm text-muted-foreground">
-                    Selected: {moodleVersions.join(', ')}
-                  </div>
-                )}
-              </div>
-            ) : isAddContainerMode ? (
+            {isAddContainerMode ? (
               <div className="space-y-2">
                 <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto border rounded-md p-3">
                   {availableMoodleVersions.map((mv) => (
@@ -443,99 +392,6 @@ export function CreateEnvironmentModal({
               </Select>
             )}
           </div>
-
-          {/* Advanced Settings Collapsible */}
-          {!isAddContainerMode && (
-          <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
-            <div className="flex justify-end">
-              <CollapsibleTrigger asChild>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="text-muted-foreground hover:text-foreground"
-                >
-                  {showAdvanced ? (
-                    <>
-                      <ChevronDown className="h-4 w-4 mr-2" />
-                      Hide Advanced Settings
-                    </>
-                  ) : (
-                    <>
-                      <ChevronRight className="h-4 w-4 mr-2" />
-                      Advanced Settings
-                    </>
-                  )}
-                </Button>
-              </CollapsibleTrigger>
-            </div>
-
-            <CollapsibleContent className="space-y-6 pt-4 border-t">
-              {/* Database Engine and PHP Version selectors are hidden for now:
-                  the backend picks DB/PHP automatically based on the Moodle
-                  version (see moodle-versions-to-supported-php-versions.yaml).
-                  Re-enable once the backend accepts overrides. */}
-
-              {/* Additional Plugins */}
-              <div className="space-y-3">
-                <Label>Additional Plugins</Label>
-                <p className="text-sm text-muted-foreground">
-                  Add extra plugins to install alongside your main plugin (use repository URLs or plugin names)
-                </p>
-
-                {/* Plugin Input */}
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="e.g., https://github.com/user/plugin.git or plugin_name"
-                    value={newPluginInput}
-                    onChange={(e) => setNewPluginInput(e.target.value)}
-                    onKeyPress={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        handleAddPlugin();
-                      }
-                    }}
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={handleAddPlugin}
-                    disabled={!newPluginInput.trim()}
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
-
-                {/* Plugin List */}
-                {additionalPlugins.length > 0 && (
-                  <div className="space-y-2">
-                    <div className="text-sm font-medium">Added plugins:</div>
-                    <div className="space-y-1">
-                      {additionalPlugins.map((plugin, index) => (
-                        <div
-                          key={index}
-                          className="flex items-center justify-between p-2 bg-muted rounded-md"
-                        >
-                          <span className="text-sm font-mono">{plugin}</span>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleRemovePlugin(plugin)}
-                            className="h-6 w-6 p-0 hover:bg-destructive hover:text-destructive-foreground"
-                          >
-                            <X className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </CollapsibleContent>
-          </Collapsible>
-          )}
 
           <DialogFooter className="pt-6">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>

@@ -4,7 +4,7 @@ import { cn } from "./ui/utils";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import { Badge } from "./ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "./ui/dropdown-menu";
-import { Play, Square, Trash2, MoreHorizontal, Copy, ExternalLink, Settings, Download, Clock, Pin, GitPullRequest, ChevronDown, ChevronRight, Plus, Network, Container, Server, GitBranch, Tag, Package, Database, Binary } from "lucide-react";
+import { Play, Square, Trash2, MoreHorizontal, Copy, ExternalLink, Settings, Download, Pin, GitPullRequest, ChevronDown, ChevronRight, Plus, Network, Container, Server, GitBranch, Tag, Package, Database, Binary } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 import { toast } from "sonner";
 
@@ -101,11 +101,9 @@ interface EnvironmentsTableProps {
   onStopContainer: (environmentId: string, containerId: string) => void;
   onDeleteContainer: (environmentId: string, containerId: string) => void;
   onDeleteEnvironment: (id: string) => void;
-  onAddContainer: (environmentId: string, moodleVersions: string[], advancedConfig?: any) => void;
+  onAddContainer: (environmentId: string, moodleVersions: string[]) => void;
   onRowClick: (environment: Environment) => void;
   onContainerClick: (environment: Environment, container: MoodleContainer) => void;
-  onContainerDetails?: (environment: Environment, container: MoodleContainer) => void;
-  onViewTimeline: (environment: Environment, container?: MoodleContainer) => void;
 }
 
 export function EnvironmentsTable({
@@ -119,8 +117,6 @@ export function EnvironmentsTable({
   onAddContainer,
   onRowClick,
   onContainerClick,
-  onContainerDetails,
-  onViewTimeline
 }: EnvironmentsTableProps) {
   const [expandedEnvironments, setExpandedEnvironments] = useState<Set<string>>(new Set());
 
@@ -259,7 +255,6 @@ export function EnvironmentsTable({
           <TableRow className="border-b-2 border-border hover:bg-table-header">
             <TableHead className="w-[30%] font-semibold text-table-header-foreground text-center">Name</TableHead>
             <TableHead className="w-[20%] font-semibold text-table-header-foreground">Plugin & Version</TableHead>
-            <TableHead className="w-[15%] font-semibold text-table-header-foreground">Owner</TableHead>
             <TableHead className="w-[15%] font-semibold text-table-header-foreground">Status</TableHead>
             <TableHead className="w-[10%] font-semibold text-table-header-foreground">Created</TableHead>
             <TableHead className="w-[10%] font-semibold text-table-header-foreground text-center">Actions</TableHead>
@@ -311,10 +306,6 @@ export function EnvironmentsTable({
                               <div className="font-medium flex items-center gap-2">
                                 <span
                                   className="cursor-pointer hover:text-primary"
-                                  onClick={(e: React.MouseEvent) => {
-                                    e.stopPropagation();
-                                    onContainerDetails?.(env, container);
-                                  }}
                                 >
                                   Moodle {container.moodleVersion}
                                 </span>
@@ -464,18 +455,6 @@ export function EnvironmentsTable({
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => handleMenuAction('clone', env, container)}>
-                                  <Copy className="h-4 w-4 mr-2" />
-                                  Clone Container
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => onContainerDetails?.(env, container)}>
-                                  <Settings className="h-4 w-4 mr-2" />
-                                  Details
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => onViewTimeline(env, container)}>
-                                  <Clock className="h-4 w-4 mr-2" />
-                                  View Timeline
-                                </DropdownMenuItem>
                                 <DropdownMenuItem
                                   className="text-destructive focus:bg-destructive focus:text-destructive-foreground"
                                   onClick={(e: React.MouseEvent) => {
@@ -590,19 +569,6 @@ export function EnvironmentsTable({
                       </div>
                     </TableCell>
                     <TableCell>
-                      {env.isWebhookCreated && (
-                        <GitPullRequest
-                          className="h-4 w-4 text-warning"
-                          aria-label="Created from GitHub webhook"
-                        />
-                      )}
-                      {env.createdBy?.name ? (
-                        <span className="text-sm">{env.createdBy.name}</span>
-                      ) : (
-                        <span className="text-muted-foreground">-</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
                       <Badge variant={statusBadge.variant} className={statusBadge.className}>
                         {envStatus === "no-containers" ? "No containers" :
                          envStatus === "mixed" ? `Mixed (${env.containers.filter(c => c.status === 'running').length}/${env.containers.length})` :
@@ -635,26 +601,12 @@ export function EnvironmentsTable({
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleMenuAction('clone', env)}>
-                              <Copy className="h-4 w-4 mr-2" />
-                              Clone Environment
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleMenuAction('export', env)}>
-                              <Download className="h-4 w-4 mr-2" />
-                              Export Environment
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => onViewTimeline(env)}>
-                              <Clock className="h-4 w-4 mr-2" />
-                              View Timeline
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleMenuAction('settings', env)}>
-                              <Settings className="h-4 w-4 mr-2" />
-                              Settings
-                            </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={(e: React.MouseEvent) => {
                                 e.stopPropagation();
-                                onDeleteEnvironment(env.id);
+                                if (window.confirm(`Are you sure you want to delete the environment "${env.name}"? This action cannot be undone.`)) {
+                                  onDeleteEnvironment(env.id);
+                                }
                               }}
                               className="text-destructive focus:bg-destructive focus:text-destructive-foreground"
                             >

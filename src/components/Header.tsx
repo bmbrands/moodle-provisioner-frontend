@@ -1,14 +1,12 @@
-import { Settings, Activity, Users, FileText } from "lucide-react";
+import { Settings, FileText } from "lucide-react";
 import { Button } from "./ui/button";
 import { Card, CardContent } from "./ui/card";
-import { UserAvatar } from "./UserAvatar";
 import type { User } from "../types/user";
 
 interface HeaderProps {
   currentUser: User | null;
   onOpenHostMetrics: () => void;
   onOpenAdminSettings: () => void;
-  onOpenUserManagement: () => void;
   onOpenAuditLog: () => void;
   onOpenUserProfile: () => void;
   onLogout: () => void;
@@ -19,16 +17,9 @@ interface HeaderProps {
 }
 
 export function Header({
-  currentUser,
-  onOpenHostMetrics,
   onOpenAdminSettings,
-  onOpenUserManagement,
   onOpenAuditLog,
-  onOpenUserProfile,
-  onLogout,
   canAccessAdminSettings,
-  canViewMetrics,
-  canManageUsers,
   canViewAuditLog
 }: HeaderProps) {
   return (
@@ -43,26 +34,6 @@ export function Header({
               </p>
             </div>
             <nav className="flex items-center gap-4">
-              {canViewMetrics && (
-                <Button
-                  variant="ghost"
-                  className="flex items-center gap-2 hover:bg-accent hover:text-accent-foreground"
-                  onClick={onOpenHostMetrics}
-                >
-                  <Activity className="h-4 w-4" />
-                  Host Metrics
-                </Button>
-              )}
-              {canManageUsers && (
-                <Button
-                  variant="ghost"
-                  className="flex items-center gap-2 hover:bg-accent hover:text-accent-foreground"
-                  onClick={onOpenUserManagement}
-                >
-                  <Users className="h-4 w-4" />
-                  Users
-                </Button>
-              )}
               {canViewAuditLog && (
                 <Button
                   variant="ghost"
@@ -82,13 +53,6 @@ export function Header({
                   <Settings className="h-4 w-4" />
                   Admin Settings
                 </Button>
-              )}
-              {currentUser && (
-                <UserAvatar
-                  user={currentUser}
-                  onOpenProfile={onOpenUserProfile}
-                  onLogout={onLogout}
-                />
               )}
             </nav>
           </div>
