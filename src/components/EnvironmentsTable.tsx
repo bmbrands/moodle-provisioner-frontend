@@ -240,7 +240,7 @@ export function EnvironmentsTable({
             <TableHead className="w-[30%] font-semibold text-table-header-foreground text-center">Name</TableHead>
             <TableHead className="w-[20%] font-semibold text-table-header-foreground">Plugin & Version</TableHead>
             <TableHead className="w-[15%] font-semibold text-table-header-foreground">Status</TableHead>
-            <TableHead className="w-[10%] font-semibold text-table-header-foreground">Created</TableHead>
+            <TableHead className="w-[10%] font-semibold text-table-header-foreground">Creator</TableHead>
             <TableHead className="w-[10%] font-semibold text-table-header-foreground text-center">Actions</TableHead>
           </TableRow>
         </TableHeader>
@@ -559,7 +559,16 @@ export function EnvironmentsTable({
                          envStatus}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-muted-foreground">{env.createdAt}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {env.createdBy?.name ? (
+                        <div className="flex flex-col">
+                          <span className="text-foreground">{env.createdBy.name}</span>
+                          <span className="text-xs text-muted-foreground">{env.createdAt}</span>
+                        </div>
+                      ) : (
+                        env.createdAt
+                      )}
+                    </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
                         <Button
