@@ -32,6 +32,7 @@ export interface User {
   lastLoginAt: string;
   createdAt: string;
   isActive: boolean;
+  mustChangePassword?: boolean;
 }
 
 export const defaultRoles: Role[] = [

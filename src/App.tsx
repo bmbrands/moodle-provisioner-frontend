@@ -10,11 +10,14 @@ import { AuditLogModal } from "./components/AuditLogModal";
 import { EnvironmentFiltersComponent, applyEnvironmentFilters, defaultFilters } from "./components/EnvironmentFilters";
 import type { EnvironmentFilters } from "./components/EnvironmentFilters";
 import { Header } from "./components/Header";
+import { LoginScreen } from "./components/LoginScreen";
+import { UserManagementModal } from "./components/UserManagementModal";
 import { useAuth } from "./hooks/useAuth";
 import { useAuditLog } from "./hooks/useAuditLog";
 import type { Plugin } from "./types/plugin";
 import { toast } from "sonner";
-import { fetchInfrastructures, startContainer as apiStartContainer, stopContainer as apiStopContainer, deleteContainer as apiDeleteContainer, deleteInfrastructure as apiDeleteInfrastructure, fetchPlugins as apiFetchPlugins, createPlugin as apiCreatePlugin, updatePlugin as apiUpdatePlugin, deletePlugin as apiDeletePlugin, createInfrastructure as apiCreateInfrastructure, addContainers as apiAddContainers } from "./services/api";
+import { fetchInfrastructures, startContainer as apiStartContainer, stopContainer as apiStopContainer, deleteContainer as apiDeleteContainer, deleteInfrastructure as apiDeleteInfrastructure, fetchPlugins as apiFetchPlugins, createPlugin as apiCreatePlugin, updatePlugin as apiUpdatePlugin, deletePlugin as apiDeletePlugin, createInfrastructure as apiCreateInfrastructure, addContainers as apiAddContainers, fetchUsers as apiFetchUsers, createUser as apiCreateUser, updateUser as apiUpdateUser, deleteUser as apiDeleteUser } from "./services/api";
+import type { User } from "./types/user";
 
 // mockEnvironments removed - real data comes from fetchInfrastructures()
 
@@ -30,9 +33,32 @@ export default function App() {
   const [addContainerEnvironment, setAddContainerEnvironment] = useState<Environment | null>(null);
   const [isAdminSettingsOpen, setIsAdminSettingsOpen] = useState(false);
   const [isAuditLogOpen, setIsAuditLogOpen] = useState(false);
+  const [isUserManagementOpen, setIsUserManagementOpen] = useState(false);
+  const [users, setUsers] = useState<User[]>([]);
 
-  // Fetch real infrastructure data from the API
+  // Load the user directory when an admin opens the user-management modal.
+  const refreshUsers = () => {
+    apiFetchUsers()
+      .then(setUsers)
+      .catch((err) => {
+        console.error("Failed to fetch users:", err);
+        toast.error("Failed to load users");
+      });
+  };
   useEffect(() => {
+    if (isUserManagementOpen && auth.canManageUsers) {
+      refreshUsers();
+    }
+  }, [isUserManagementOpen, auth.canManageUsers]);
+
+  // Fetch real infrastructure data from the API. Runs once the user is
+  // authenticated and past any forced password change (protected endpoints
+  // return 401/403 otherwise), and re-runs when that becomes true so the list
+  // appears immediately after the first login instead of only after a reload.
+  const canLoadData = auth.isAuthenticated && !auth.mustChangePassword;
+  useEffect(() => {
+    if (!canLoadData) return;
+    setIsLoading(true);
     fetchInfrastructures()
       .then((envs) => {
         setEnvironments(envs);
@@ -43,7 +69,7 @@ export default function App() {
         toast.error("Failed to load environments from API");
         setIsLoading(false);
       });
-  }, []);
+  }, [canLoadData]);
 
   // Poll the backend while any container is still provisioning, so the list
   // updates automatically once setup + build finish.
@@ -728,6 +754,85 @@ export default function App() {
       });
   };
 
+  // --- User management handlers (wired to the real /api/users endpoints) ---
+  const handleCreateUser = (
+    user: Omit<User, "id" | "createdAt" | "lastLoginAt"> & { password: string }
+  ) => {
+    apiCreateUser({
+      email: user.email,
+      first_name: user.firstName,
+      last_name: user.lastName,
+      password: user.password,
+      roles: user.roles.map((r) => r.id),
+      avatar: user.avatar,
+    })
+      .then(() => {
+        toast.success(`User "${user.email}" created`);
+        refreshUsers();
+      })
+      .catch((err: unknown) => {
+        toast.error(err instanceof Error ? err.message : "Failed to create user");
+      });
+  };
+
+  const handleUpdateUser = (user: User, password?: string) => {
+    apiUpdateUser(user.id, {
+      first_name: user.firstName,
+      last_name: user.lastName,
+      email: user.email,
+      roles: user.roles.map((r) => r.id),
+      is_active: user.isActive,
+      ...(password ? { password } : {}),
+    })
+      .then((updated) => {
+        toast.success(`User "${updated.email}" updated`);
+        refreshUsers();
+        if (auth.currentUser && updated.id === auth.currentUser.id) {
+          auth.updateCurrentUser(updated);
+        }
+      })
+      .catch((err: unknown) => {
+        toast.error(err instanceof Error ? err.message : "Failed to update user");
+      });
+  };
+
+  const handleDeleteUser = (userId: string) => {
+    apiDeleteUser(userId)
+      .then(() => {
+        toast.success("User deleted");
+        refreshUsers();
+      })
+      .catch((err: unknown) => {
+        toast.error(err instanceof Error ? err.message : "Failed to delete user");
+      });
+  };
+
+  const handleLogout = () => {
+    void auth.logout();
+  };
+
+  // --- Auth gating: loading -> login -> forced password change -> app ---
+  if (auth.isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center text-muted-foreground">
+        Loading…
+      </div>
+    );
+  }
+  if (!auth.isAuthenticated || auth.mustChangePassword) {
+    return (
+      <LoginScreen
+        onLogin={async (email, password) => {
+          await auth.login(email, password);
+        }}
+        mustChangePassword={auth.mustChangePassword}
+        onChangePassword={async (currentPassword, newPassword) => {
+          await auth.changePassword(currentPassword, newPassword);
+        }}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background p-6">
 
@@ -737,6 +842,8 @@ export default function App() {
           currentUser={auth.currentUser}
           onOpenAdminSettings={() => setIsAdminSettingsOpen(true)}
           onOpenAuditLog={() => setIsAuditLogOpen(true)}
+          onOpenUserManagement={() => setIsUserManagementOpen(true)}
+          onLogout={handleLogout}
           canAccessAdminSettings={auth.canAccessAdminSettings}
           canViewMetrics={auth.canViewMetrics}
           canManageUsers={auth.canManageUsers}
@@ -846,6 +953,18 @@ export default function App() {
             onOpenChange={setIsAuditLogOpen}
             auditLogs={auditLog.auditLogs}
             onExportLogs={auditLog.exportLogs}
+          />
+        )}
+
+        {/* User Management Modal */}
+        {auth.canManageUsers && (
+          <UserManagementModal
+            open={isUserManagementOpen}
+            onOpenChange={setIsUserManagementOpen}
+            users={users}
+            onCreateUser={handleCreateUser}
+            onUpdateUser={handleUpdateUser}
+            onDeleteUser={handleDeleteUser}
           />
         )}
 
