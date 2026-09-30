@@ -16,8 +16,9 @@ import { useAuth } from "./hooks/useAuth";
 import { useAuditLog } from "./hooks/useAuditLog";
 import type { Plugin } from "./types/plugin";
 import { toast } from "sonner";
-import { fetchInfrastructures, startContainer as apiStartContainer, stopContainer as apiStopContainer, deleteContainer as apiDeleteContainer, deleteInfrastructure as apiDeleteInfrastructure, fetchPlugins as apiFetchPlugins, createPlugin as apiCreatePlugin, updatePlugin as apiUpdatePlugin, deletePlugin as apiDeletePlugin, createInfrastructure as apiCreateInfrastructure, addContainers as apiAddContainers, fetchUsers as apiFetchUsers, createUser as apiCreateUser, updateUser as apiUpdateUser, deleteUser as apiDeleteUser } from "./services/api";
+import { fetchInfrastructures, startContainer as apiStartContainer, stopContainer as apiStopContainer, deleteContainer as apiDeleteContainer, deleteInfrastructure as apiDeleteInfrastructure, fetchPlugins as apiFetchPlugins, createPlugin as apiCreatePlugin, updatePlugin as apiUpdatePlugin, deletePlugin as apiDeletePlugin, createInfrastructure as apiCreateInfrastructure, addContainers as apiAddContainers, fetchLifecyclePolicy, fetchUsers as apiFetchUsers, createUser as apiCreateUser, updateUser as apiUpdateUser, deleteUser as apiDeleteUser } from "./services/api";
 import type { User } from "./types/user";
+import type { LifecyclePolicy } from "./services/api";
 
 // mockEnvironments removed - real data comes from fetchInfrastructures()
 
@@ -35,6 +36,7 @@ export default function App() {
   const [isAuditLogOpen, setIsAuditLogOpen] = useState(false);
   const [isUserManagementOpen, setIsUserManagementOpen] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
+  const [lifecyclePolicy, setLifecyclePolicy] = useState<LifecyclePolicy | null>(null);
 
   // Load the user directory when an admin opens the user-management modal.
   const refreshUsers = () => {
@@ -69,7 +71,18 @@ export default function App() {
         toast.error("Failed to load environments from API");
         setIsLoading(false);
       });
+    fetchLifecyclePolicy()
+      .then(setLifecyclePolicy)
+      .catch((err) => console.error("Failed to fetch lifecycle policy:", err));
   }, [canLoadData]);
+
+  // Re-fetch after a start/stop so auto-stop / auto-delete times reflect the
+  // new state (the backend computes them from the transition timestamps).
+  const refreshEnvironments = () => {
+    fetchInfrastructures()
+      .then(setEnvironments)
+      .catch((err) => console.error("Failed to refresh infrastructures:", err));
+  };
 
   // Poll the backend while any container is still provisioning, so the list
   // updates automatically once setup + build finish.
@@ -277,6 +290,7 @@ export default function App() {
           )
         );
         toast.success(`Container Moodle ${container.moodleVersion} started successfully!`);
+        refreshEnvironments();
       })
       .catch((err) => {
         console.error("Failed to start container:", err);
@@ -355,6 +369,7 @@ export default function App() {
           )
         );
         toast.success(`Container Moodle ${container.moodleVersion} stopped successfully!`);
+        refreshEnvironments();
       })
       .catch((err) => {
         console.error("Failed to stop container:", err);
@@ -901,6 +916,7 @@ export default function App() {
               onAddContainer={handleAddContainer}
               onRowClick={handleRowClick}
               onContainerClick={handleContainerClick}
+              lifecyclePolicy={lifecyclePolicy}
             />
             )}
           </CardContent>

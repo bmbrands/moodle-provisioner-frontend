@@ -10,6 +10,8 @@ interface ApiMoodleContainer {
   www_port: string;
   db_port: string;
   created_at: string;
+  auto_stop_at?: string | null;
+  auto_delete_at?: string | null;
 }
 
 interface ApiInfrastructure {
@@ -68,6 +70,8 @@ function mapInfrastructureToEnvironment(infra: ApiInfrastructure): Environment {
       url: m.url,
       adminPassword: m.admin_password,
       createdAt: formatDate(m.created_at),
+      ...(m.auto_stop_at ? { autoStopAt: formatDate(m.auto_stop_at) } : {}),
+      ...(m.auto_delete_at ? { autoDeleteAt: formatDate(m.auto_delete_at) } : {}),
     })),
     ...(phase ? { provisioningPhase: phase } : {}),
     ...(infra.provisioning_error ? { provisioningError: infra.provisioning_error } : {}),
@@ -385,6 +389,25 @@ export async function clearServerLogs(): Promise<void> {
     const detail = await response.text();
     throw new Error(`Failed to clear server logs: ${response.status} ${detail}`);
   }
+}
+
+// ---- Lifecycle policy --------------------------------------------------
+
+export interface LifecyclePolicy {
+  auto_stop_enabled: boolean;
+  max_runtime_minutes: number;
+  daily_stop_time: string; // "HH:MM" UTC, empty when disabled
+  auto_cleanup_enabled: boolean;
+  stopped_retention_days: number;
+  cleanup_empty_infrastructures: boolean;
+}
+
+export async function fetchLifecyclePolicy(): Promise<LifecyclePolicy> {
+  const response = await fetch("/api/lifecycle");
+  if (!response.ok) {
+    throw new Error(`Failed to fetch lifecycle policy: ${response.status}`);
+  }
+  return response.json();
 }
 
 // ---- Settings ----------------------------------------------------------

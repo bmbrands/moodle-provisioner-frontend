@@ -4,9 +4,11 @@ import { cn } from "./ui/utils";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import { Badge } from "./ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "./ui/dropdown-menu";
-import { Play, Square, Trash2, MoreHorizontal, Copy, ExternalLink, Settings, Download, Pin, GitPullRequest, ChevronDown, ChevronRight, Plus, Network, Container, Server, GitBranch, Tag, Package, Database, Binary } from "lucide-react";
+import { Play, Square, Trash2, MoreHorizontal, Copy, ExternalLink, Settings, Download, Pin, GitPullRequest, ChevronDown, ChevronRight, Plus, Network, Container, Server, GitBranch, Tag, Package, Database, Binary, HelpCircle } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
+import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { toast } from "sonner";
+import type { LifecyclePolicy } from "../services/api";
 
 import type { Plugin } from "../types/plugin";
 
@@ -17,6 +19,9 @@ export interface MoodleContainer {
   url: string;
   adminPassword: string;
   createdAt: string;
+  // Formatted lifecycle deadlines, present only when automation applies.
+  autoStopAt?: string;
+  autoDeleteAt?: string;
   advancedConfig?: {
     database: string;
     phpVersion: string;
@@ -79,6 +84,62 @@ const getVersionIcon = (plugin: Plugin | undefined, versionType: Environment["ve
   }
 };
 
+// Render a "HH:MM" UTC time in the viewer's local time zone.
+const utcTimeToLocal = (hhmm: string) => {
+  const [h, m] = hhmm.split(":").map(Number);
+  if (Number.isNaN(h) || Number.isNaN(m)) return hhmm;
+  const d = new Date();
+  d.setUTCHours(h, m, 0, 0);
+  return d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+};
+
+const LifecycleHelp = ({ policy }: { policy: LifecyclePolicy | null }) => {
+  const stopRule = policy
+    ? [
+        `after ${policy.max_runtime_minutes} minutes of running`,
+        policy.daily_stop_time
+          ? `or at ${utcTimeToLocal(policy.daily_stop_time)} (your time) each day, whichever comes first`
+          : "",
+      ].filter(Boolean).join(" ")
+    : "after a configured maximum running time";
+  const retention = policy
+    ? `${policy.stopped_retention_days} day${policy.stopped_retention_days !== 1 ? "s" : ""}`
+    : "a configured number of days";
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          aria-label="What do these times mean?"
+          className="text-muted-foreground hover:text-foreground"
+          onClick={(e: React.MouseEvent) => e.stopPropagation()}
+        >
+          <HelpCircle className="h-3.5 w-3.5" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        className="w-80 text-sm space-y-2"
+        align="start"
+        onClick={(e: React.MouseEvent) => e.stopPropagation()}
+      >
+        <p className="font-medium">Automatic stop and cleanup</p>
+        <p>
+          <span className="font-medium">Auto stop:</span> a running instance is stopped {stopRule}.
+          Its data is kept, so you can start it again at any time.
+        </p>
+        <p>
+          <span className="font-medium">Auto delete:</span> an instance that stays stopped for {retention} is
+          deleted, including its data. Starting it again resets this timer.
+        </p>
+        <p className="text-muted-foreground text-xs">
+          The check runs periodically (about every 15 minutes), so the action may happen a little after the time shown.
+        </p>
+      </PopoverContent>
+    </Popover>
+  );
+};
+
 interface EnvironmentsTableProps {
   environments: Environment[];
   plugins: Plugin[];
@@ -89,6 +150,7 @@ interface EnvironmentsTableProps {
   onAddContainer: (environmentId: string, moodleVersions: string[]) => void;
   onRowClick: (environment: Environment) => void;
   onContainerClick: (environment: Environment, container: MoodleContainer) => void;
+  lifecyclePolicy?: LifecyclePolicy | null;
 }
 
 export function EnvironmentsTable({
@@ -101,6 +163,7 @@ export function EnvironmentsTable({
   onAddContainer,
   onRowClick,
   onContainerClick,
+  lifecyclePolicy = null,
 }: EnvironmentsTableProps) {
   const [expandedEnvironments, setExpandedEnvironments] = useState<Set<string>>(new Set());
 
@@ -359,6 +422,14 @@ export function EnvironmentsTable({
                                   <div className="flex items-center gap-1 text-sm">
                                     <span className="text-muted-foreground">Created:</span>
                                     <span className="text-muted-foreground">{container.createdAt}</span>
+                                  </div>
+                                )}
+                                {((container.status === "running" && container.autoStopAt) ||
+                                  (container.status === "stopped" && container.autoDeleteAt)) && (
+                                  <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                                    <span>{container.status === "running" ? "Auto stop:" : "Auto delete:"}</span>
+                                    <span>{container.status === "running" ? container.autoStopAt : container.autoDeleteAt}</span>
+                                    <LifecycleHelp policy={lifecyclePolicy} />
                                   </div>
                                 )}
                                 <div className="flex items-center gap-1 text-sm">
