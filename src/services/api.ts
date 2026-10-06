@@ -410,6 +410,21 @@ export async function fetchLifecyclePolicy(): Promise<LifecyclePolicy> {
   return response.json();
 }
 
+export async function updateLifecyclePolicy(
+  policy: LifecyclePolicy
+): Promise<LifecyclePolicy> {
+  const response = await fetch("/api/lifecycle", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(policy),
+  });
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`Failed to save lifecycle policy: ${response.status} ${detail}`);
+  }
+  return response.json();
+}
+
 // ---- Settings ----------------------------------------------------------
 
 export type SettingValue = string | number | boolean;

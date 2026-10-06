@@ -16,7 +16,7 @@ import { useAuth } from "./hooks/useAuth";
 import { useAuditLog } from "./hooks/useAuditLog";
 import type { Plugin } from "./types/plugin";
 import { toast } from "sonner";
-import { fetchInfrastructures, startContainer as apiStartContainer, stopContainer as apiStopContainer, deleteContainer as apiDeleteContainer, deleteInfrastructure as apiDeleteInfrastructure, fetchPlugins as apiFetchPlugins, createPlugin as apiCreatePlugin, updatePlugin as apiUpdatePlugin, deletePlugin as apiDeletePlugin, createInfrastructure as apiCreateInfrastructure, addContainers as apiAddContainers, fetchLifecyclePolicy, fetchUsers as apiFetchUsers, createUser as apiCreateUser, updateUser as apiUpdateUser, deleteUser as apiDeleteUser } from "./services/api";
+import { fetchInfrastructures, startContainer as apiStartContainer, stopContainer as apiStopContainer, deleteContainer as apiDeleteContainer, deleteInfrastructure as apiDeleteInfrastructure, fetchPlugins as apiFetchPlugins, createPlugin as apiCreatePlugin, updatePlugin as apiUpdatePlugin, deletePlugin as apiDeletePlugin, createInfrastructure as apiCreateInfrastructure, addContainers as apiAddContainers, fetchLifecyclePolicy, updateLifecyclePolicy, fetchUsers as apiFetchUsers, createUser as apiCreateUser, updateUser as apiUpdateUser, deleteUser as apiDeleteUser } from "./services/api";
 import type { User } from "./types/user";
 import type { LifecyclePolicy } from "./services/api";
 
@@ -82,6 +82,32 @@ export default function App() {
     fetchInfrastructures()
       .then(setEnvironments)
       .catch((err) => console.error("Failed to refresh infrastructures:", err));
+  };
+
+  // Save the lifecycle policy (Admin Settings) and refresh the per-instance
+  // auto-stop / auto-delete times that depend on it.
+  const handleSaveLifecyclePolicy = async (policy: LifecyclePolicy) => {
+    try {
+      const saved = await updateLifecyclePolicy(policy);
+      setLifecyclePolicy(saved);
+      refreshEnvironments();
+      toast.success("Lifecycle settings saved");
+      if (auth.currentUser) {
+        auditLog.logActivity(
+          auth.currentUser.id,
+          `${auth.currentUser.firstName} ${auth.currentUser.lastName}`,
+          auth.currentUser.email,
+          'update',
+          'settings',
+          { section: 'lifecycle', ...saved },
+          'lifecycle',
+          'Lifecycle settings'
+        );
+      }
+    } catch (err) {
+      console.error("Failed to save lifecycle policy:", err);
+      toast.error(err instanceof Error ? err.message : "Failed to save lifecycle settings");
+    }
   };
 
   // Poll the backend while any container is still provisioning, so the list
@@ -956,6 +982,8 @@ export default function App() {
           <AdminSettingsModal
             open={isAdminSettingsOpen}
             onOpenChange={setIsAdminSettingsOpen}
+            lifecyclePolicy={lifecyclePolicy}
+            onSaveLifecyclePolicy={handleSaveLifecyclePolicy}
             plugins={plugins}
             onTogglePluginActive={handleTogglePluginActive}
             onDeletePlugin={handleDeletePlugin}
