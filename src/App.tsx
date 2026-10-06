@@ -110,15 +110,17 @@ export default function App() {
     });
   }, [environments]);
 
-  // Fetch plugin catalog from the API
+  // Fetch plugin catalog from the API once authenticated (the endpoint is
+  // protected, so fetching before login only yields a 401 and an empty catalog).
   useEffect(() => {
+    if (!canLoadData) return;
     apiFetchPlugins()
       .then(setPlugins)
       .catch((err) => {
         console.error("Failed to fetch plugins:", err);
         toast.error("Failed to load plugin catalog from API");
       });
-  }, []);
+  }, [canLoadData]);
 
   // Apply filters to get filtered environments
   const filteredEnvironments = useMemo(() => {
