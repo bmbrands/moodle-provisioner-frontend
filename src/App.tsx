@@ -984,6 +984,25 @@ export default function App() {
             onOpenChange={setIsAdminSettingsOpen}
             lifecyclePolicy={lifecyclePolicy}
             onSaveLifecyclePolicy={handleSaveLifecyclePolicy}
+            currentUserEmail={auth.currentUser?.email}
+            onEmailSettingsSaved={(saved) => {
+              if (!auth.currentUser) return;
+              auditLog.logActivity(
+                auth.currentUser.id,
+                `${auth.currentUser.firstName} ${auth.currentUser.lastName}`,
+                auth.currentUser.email,
+                'update',
+                'settings',
+                {
+                  section: 'email',
+                  smtpHost: saved.smtp.host,
+                  deletionWarning: saved.deletion_warning.enabled,
+                  hoursBefore: saved.deletion_warning.hours_before,
+                },
+                'email',
+                'Email settings'
+              );
+            }}
             plugins={plugins}
             onTogglePluginActive={handleTogglePluginActive}
             onDeletePlugin={handleDeletePlugin}

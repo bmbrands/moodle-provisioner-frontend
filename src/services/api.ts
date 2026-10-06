@@ -425,6 +425,73 @@ export async function updateLifecyclePolicy(
   return response.json();
 }
 
+// ---- Email settings ----------------------------------------------------
+
+export type SmtpSecurity = "none" | "starttls" | "ssl";
+
+export interface EmailSettingsForm {
+  smtp: {
+    host: string;
+    port: number;
+    security: SmtpSecurity;
+    username: string;
+    // null keeps the stored password, "" clears it.
+    password: string | null;
+    from_address: string;
+    from_name: string;
+  };
+  portal_url: string;
+  timezone: string;
+  deletion_warning: {
+    enabled: boolean;
+    hours_before: number;
+    subject: string;
+    body: string;
+  };
+}
+
+export interface EmailSettingsResponse extends Omit<EmailSettingsForm, "smtp"> {
+  smtp: Omit<EmailSettingsForm["smtp"], "password"> & { password_set: boolean };
+  default_portal_url: string;
+  variables: { name: string; description: string; example: string }[];
+  defaults: { subject: string; body: string };
+}
+
+async function emailRequest<T>(path: string, method: string, body?: unknown): Promise<T> {
+  const response = await fetch(`/api/email${path}`, {
+    method,
+    headers: body ? { "Content-Type": "application/json" } : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!response.ok) {
+    let detail = `${response.status}`;
+    try {
+      const data = await response.json();
+      detail = typeof data.detail === "string"
+        ? data.detail
+        : Array.isArray(data.detail)
+          ? data.detail.map((d: { loc?: string[]; msg: string }) => `${(d.loc ?? []).slice(1).join(".")}: ${d.msg}`).join("; ")
+          : detail;
+    } catch {
+      // keep the status code
+    }
+    throw new Error(detail);
+  }
+  return response.json();
+}
+
+export const fetchEmailSettings = () =>
+  emailRequest<EmailSettingsResponse>("", "GET");
+
+export const updateEmailSettings = (settings: EmailSettingsForm) =>
+  emailRequest<EmailSettingsResponse>("", "PUT", settings);
+
+export const sendTestEmail = (to: string, settings: EmailSettingsForm) =>
+  emailRequest<{ ok: boolean; message: string }>("/test", "POST", { to, settings });
+
+export const previewEmail = (subject: string, body: string) =>
+  emailRequest<{ subject: string; body: string }>("/preview", "POST", { subject, body });
+
 // ---- Settings ----------------------------------------------------------
 
 export type SettingValue = string | number | boolean;

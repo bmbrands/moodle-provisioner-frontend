@@ -1,8 +1,9 @@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./ui/dialog";
-import { Package, Settings, Timer } from "lucide-react";
+import { Mail, Package, Settings, Timer } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { LifecycleSettingsTab } from "./LifecycleSettingsTab";
-import type { LifecyclePolicy } from "../services/api";
+import { EmailSettingsTab } from "./EmailSettingsTab";
+import type { EmailSettingsResponse, LifecyclePolicy } from "../services/api";
 import { useState } from "react";
 import { PluginCatalogTable } from "./PluginCatalogTable";
 import { AddPluginModal } from "./AddPluginModal";
@@ -21,6 +22,8 @@ interface AdminSettingsModalProps {
   ) => void;
   lifecyclePolicy: LifecyclePolicy | null;
   onSaveLifecyclePolicy: (policy: LifecyclePolicy) => Promise<void>;
+  currentUserEmail?: string;
+  onEmailSettingsSaved?: (settings: EmailSettingsResponse) => void;
 }
 
 export function AdminSettingsModal({
@@ -33,6 +36,8 @@ export function AdminSettingsModal({
   onUpdatePlugin,
   lifecyclePolicy,
   onSaveLifecyclePolicy,
+  currentUserEmail,
+  onEmailSettingsSaved,
 }: AdminSettingsModalProps) {
   const [isAddPluginModalOpen, setIsAddPluginModalOpen] = useState(false);
   const [editingPlugin, setEditingPlugin] = useState<Plugin | null>(null);
@@ -61,6 +66,10 @@ export function AdminSettingsModal({
                 <Timer className="h-4 w-4" />
                 Lifecycle
               </TabsTrigger>
+              <TabsTrigger value="email">
+                <Mail className="h-4 w-4" />
+                Email
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="plugins" className="mt-4 flex-1 overflow-hidden">
@@ -81,6 +90,10 @@ export function AdminSettingsModal({
 
             <TabsContent value="lifecycle" className="mt-4 flex-1 overflow-y-auto pr-1">
               <LifecycleSettingsTab policy={lifecyclePolicy} onSave={onSaveLifecyclePolicy} />
+            </TabsContent>
+
+            <TabsContent value="email" className="mt-4 flex-1 overflow-y-auto pr-1">
+              <EmailSettingsTab currentUserEmail={currentUserEmail} onSaved={onEmailSettingsSaved} />
             </TabsContent>
           </Tabs>
         </DialogContent>
