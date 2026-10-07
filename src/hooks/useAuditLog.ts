@@ -22,16 +22,18 @@ function dtoToEntry(dto: AuditEntryDto): AuditLogEntry {
   };
 }
 
-export function useAuditLog() {
+export function useAuditLog(canRead: boolean = false) {
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
 
-  // Load from backend on mount. Failures are non-fatal (we'll start with an
-  // empty log and future appends will still be persisted).
+  // Load from the backend once the user may read the log (the endpoint is
+  // restricted to the audit permission). Failures are non-fatal: we start with
+  // an empty log and future appends are still persisted.
   useEffect(() => {
+    if (!canRead) return;
     fetchAuditLog(500)
       .then(entries => setAuditLogs(entries.map(dtoToEntry)))
       .catch(err => console.error('Failed to load audit log:', err));
-  }, []);
+  }, [canRead]);
 
   const logActivity = useCallback((
     userId: string,

@@ -24,7 +24,7 @@ import type { LifecyclePolicy } from "./services/api";
 
 export default function App() {
   const auth = useAuth();
-  const auditLog = useAuditLog();
+  const auditLog = useAuditLog(auth.isAuthenticated && !auth.mustChangePassword && auth.canViewAuditLog);
   const [environments, setEnvironments] = useState<Environment[]>([]);
   const [plugins, setPlugins] = useState<Plugin[]>([]);
   const [filters, setFilters] = useState<EnvironmentFilters>(defaultFilters);
