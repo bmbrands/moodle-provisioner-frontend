@@ -514,7 +514,9 @@ export function EnvironmentsTable({
                                   className="text-destructive focus:bg-destructive focus:text-destructive-foreground"
                                   onClick={(e: React.MouseEvent) => {
                                     e.stopPropagation();
-                                    onDeleteContainer(env.id, container.id);
+                                    if (window.confirm(`Are you sure you want to delete Moodle ${container.moodleVersion} from "${env.name}"? Its data will be lost. This action cannot be undone.`)) {
+                                      onDeleteContainer(env.id, container.id);
+                                    }
                                   }}
                                 >
                                   <Trash2 className="h-4 w-4 mr-2" />
