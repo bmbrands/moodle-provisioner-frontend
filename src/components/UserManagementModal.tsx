@@ -8,7 +8,7 @@ import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
-import { UserPlus, Users, Shield, Search, MoreHorizontal, Edit, Trash2, UserX } from "lucide-react";
+import { UserPlus, Users, Shield, Search, MoreHorizontal, Edit, Trash2, UserX, UserCheck } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "./ui/dropdown-menu";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -140,8 +140,8 @@ export function UserManagementModal({
     setEditingUser(null);
   };
 
-  const deactivateUser = (user: User) => {
-    onUpdateUser({ ...user, isActive: false });
+  const setUserActive = (user: User, isActive: boolean) => {
+    onUpdateUser({ ...user, isActive });
   };
 
   return (
@@ -163,7 +163,7 @@ export function UserManagementModal({
             <TabsTrigger value="roles">Roles</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="users" className="mt-6 flex-1 flex flex-col">
+          <TabsContent value="users" className="mt-6 flex-1 min-h-0 overflow-y-auto pr-1">
             <div className="flex flex-col flex-1">
               <div className="sticky top-0 bg-background z-10 pb-4 mb-4 border-b">
                 <div className="flex items-center justify-between mb-4">
@@ -435,10 +435,17 @@ export function UserManagementModal({
                                   <Edit className="h-4 w-4 mr-2" />
                                   Edit User
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => deactivateUser(user)} disabled={!user.isActive}>
-                                  <UserX className="h-4 w-4 mr-2" />
-                                  Deactivate
-                                </DropdownMenuItem>
+                                {user.isActive ? (
+                                  <DropdownMenuItem onClick={() => setUserActive(user, false)}>
+                                    <UserX className="h-4 w-4 mr-2" />
+                                    Deactivate
+                                  </DropdownMenuItem>
+                                ) : (
+                                  <DropdownMenuItem onClick={() => setUserActive(user, true)}>
+                                    <UserCheck className="h-4 w-4 mr-2" />
+                                    Reactivate
+                                  </DropdownMenuItem>
+                                )}
                                 <DropdownMenuItem
                                   onClick={() => onDeleteUser(user.id)}
                                   className="text-destructive focus:text-destructive"
