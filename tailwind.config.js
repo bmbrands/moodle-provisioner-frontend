@@ -7,6 +7,9 @@ export default {
       colors: {
         border: "var(--border)",
         input: "var(--input)",
+        // Track colour of an unchecked <Switch>; without it the track is
+        // transparent and an "off" switch is invisible on a white background.
+        "switch-background": "var(--switch-background)",
         ring: "var(--ring)",
         background: "var(--background)",
         foreground: "var(--foreground)",
