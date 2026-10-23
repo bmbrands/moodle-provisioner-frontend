@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Search, Filter, X, Calendar, User, Package, Server, Activity, Pin, GitPullRequest, Check } from "lucide-react";
+import { Search, Filter, X, Calendar, User, Package, Server, Activity, GitPullRequest, Check } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -16,7 +16,6 @@ export interface EnvironmentFilters {
   statuses: string[];
   owners: string[];
   ageRange: "all" | "today" | "week" | "month" | "older";
-  pinnedStatus: "all" | "pinned" | "unpinned";
   creationSource: "all" | "manual" | "webhook";
 }
 
@@ -103,7 +102,6 @@ export function EnvironmentFiltersComponent({
     filters.statuses.length > 0 ||
     filters.owners.length > 0 ||
     filters.ageRange !== "all" ||
-    filters.pinnedStatus !== "all" ||
     filters.creationSource !== "all";
 
   const activeFiltersCount = [
@@ -113,7 +111,6 @@ export function EnvironmentFiltersComponent({
     filters.statuses.length > 0,
     filters.owners.length > 0,
     filters.ageRange !== "all",
-    filters.pinnedStatus !== "all",
     filters.creationSource !== "all"
   ].filter(Boolean).length;
 
@@ -254,19 +251,6 @@ export function EnvironmentFiltersComponent({
                 </Badge>
               )}
 
-              {filters.pinnedStatus !== "all" && (
-                <Badge variant="outline" className="bg-background">
-                  <Pin className="h-3 w-3 mr-1" />
-                  {filters.pinnedStatus}
-                  <button
-                    onClick={() => updateFilters('pinnedStatus', 'all')}
-                    className="ml-1 hover:text-destructive"
-                    aria-label="Clear pinned status filter"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </Badge>
-              )}
 
               {filters.creationSource !== "all" && (
                 <Badge variant="outline" className="bg-background">
@@ -440,23 +424,6 @@ export function EnvironmentFiltersComponent({
                 </Select>
               </div>
 
-              {/* Pinned Status Filter */}
-              <div className="space-y-2">
-                <Label htmlFor="pinned-filter" className="flex items-center gap-2">
-                  <Pin className="h-4 w-4" />
-                  Pin Status
-                </Label>
-                <Select value={filters.pinnedStatus} onValueChange={(value) => updateFilters('pinnedStatus', value)}>
-                  <SelectTrigger id="pinned-filter" className="bg-background shadow-sm">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All environments</SelectItem>
-                    <SelectItem value="pinned">Pinned only</SelectItem>
-                    <SelectItem value="unpinned">Unpinned only</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
 
               {/* Creation Source Filter */}
               <div className="space-y-2">
@@ -551,16 +518,6 @@ export function applyEnvironmentFilters(environments: Environment[], filters: En
       }
     }
 
-    // Pinned status filter
-    if (filters.pinnedStatus !== "all") {
-      const isPinned = env.isPinned === true;
-      if (filters.pinnedStatus === "pinned" && !isPinned) {
-        return false;
-      }
-      if (filters.pinnedStatus === "unpinned" && isPinned) {
-        return false;
-      }
-    }
 
     // Creation source filter
     if (filters.creationSource !== "all") {
@@ -615,6 +572,5 @@ export const defaultFilters: EnvironmentFilters = {
   statuses: [],
   owners: [],
   ageRange: "all",
-  pinnedStatus: "all",
   creationSource: "all"
 };

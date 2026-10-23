@@ -447,7 +447,11 @@ export function UserManagementModal({
                                   </DropdownMenuItem>
                                 )}
                                 <DropdownMenuItem
-                                  onClick={() => onDeleteUser(user.id)}
+                                  onClick={() => {
+                                    if (window.confirm(`Are you sure you want to delete the user "${user.firstName} ${user.lastName}" (${user.email})? This action cannot be undone.`)) {
+                                      onDeleteUser(user.id);
+                                    }
+                                  }}
                                   className="text-destructive focus:text-destructive"
                                 >
                                   <Trash2 className="h-4 w-4 mr-2" />

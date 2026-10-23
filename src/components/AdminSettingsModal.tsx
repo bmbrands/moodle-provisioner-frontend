@@ -72,7 +72,7 @@ export function AdminSettingsModal({
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="plugins" className="mt-4 flex-1 overflow-hidden">
+            <TabsContent value="plugins" className="mt-4 flex-1 min-h-0 overflow-y-auto pr-1">
               <PluginCatalogTable
                 plugins={plugins}
                 onToggleActive={onTogglePluginActive}
