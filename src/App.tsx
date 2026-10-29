@@ -985,6 +985,19 @@ export default function App() {
             lifecyclePolicy={lifecyclePolicy}
             onSaveLifecyclePolicy={handleSaveLifecyclePolicy}
             currentUserEmail={auth.currentUser?.email}
+            onMoodleVersionPolicySaved={(minimumVersion) => {
+              if (!auth.currentUser) return;
+              auditLog.logActivity(
+                auth.currentUser.id,
+                `${auth.currentUser.firstName} ${auth.currentUser.lastName}`,
+                auth.currentUser.email,
+                'update',
+                'settings',
+                { section: 'moodle_versions', minimumVersion },
+                'moodle_versions',
+                'Moodle version settings'
+              );
+            }}
             onEmailSettingsSaved={(saved) => {
               if (!auth.currentUser) return;
               auditLog.logActivity(

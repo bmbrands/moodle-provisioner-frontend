@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Badge } from "./ui/badge";
 import { Checkbox } from "./ui/checkbox";
 import type { Plugin, PluginVersion } from "../types/plugin";
-import { fetchPluginVersions, fetchMoodleVersions } from "../services/api";
+import { fetchPluginVersions, fetchMoodleVersions, fetchMoodleVersionPolicy, compareMoodleVersions } from "../services/api";
 
 interface CreateEnvironmentModalProps {
   open: boolean;
@@ -73,11 +73,26 @@ export function CreateEnvironmentModal({
     availableMoodleVersionsFallback
   );
   const [moodleVersionsLoading, setMoodleVersionsLoading] = useState(false);
+  // Minimum Moodle version set by an administrator ("" = none).
+  const [minimumMoodleVersion, setMinimumMoodleVersion] = useState("");
 
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
     setMoodleVersionsLoading(true);
+    fetchMoodleVersionPolicy()
+      .then((policy) => {
+        if (cancelled) return;
+        const minimum = policy.minimum_version;
+        setMinimumMoodleVersion(minimum);
+        if (minimum) {
+          // Also trim the static fallback, in case the live list fails.
+          setAvailableMoodleVersions((prev) =>
+            prev.filter((v) => compareMoodleVersions(v, minimum) >= 0)
+          );
+        }
+      })
+      .catch((err) => console.error("Failed to fetch Moodle version policy:", err));
     fetchMoodleVersions()
       .then((versions) => {
         if (cancelled) return;
@@ -349,6 +364,11 @@ export function CreateEnvironmentModal({
               Moodle Version{isAddContainerMode ? 's' : ''}
               {isAddContainerMode && <span className="text-sm text-muted-foreground ml-1">(select multiple)</span>}
             </Label>
+            {minimumMoodleVersion && (
+              <p className="text-xs text-muted-foreground">
+                Only Moodle {minimumMoodleVersion} and newer can be selected (set by an administrator).
+              </p>
+            )}
             {isAddContainerMode ? (
               <div className="space-y-2">
                 <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto border rounded-md p-3">

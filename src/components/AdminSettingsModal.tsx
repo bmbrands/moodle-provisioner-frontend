@@ -1,8 +1,9 @@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./ui/dialog";
-import { Mail, Package, Settings, Timer } from "lucide-react";
+import { Layers, Mail, Package, Settings, Timer } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { LifecycleSettingsTab } from "./LifecycleSettingsTab";
 import { EmailSettingsTab } from "./EmailSettingsTab";
+import { MoodleVersionSettingsTab } from "./MoodleVersionSettingsTab";
 import type { EmailSettingsResponse, LifecyclePolicy } from "../services/api";
 import { useState } from "react";
 import { PluginCatalogTable } from "./PluginCatalogTable";
@@ -24,6 +25,7 @@ interface AdminSettingsModalProps {
   onSaveLifecyclePolicy: (policy: LifecyclePolicy) => Promise<void>;
   currentUserEmail?: string;
   onEmailSettingsSaved?: (settings: EmailSettingsResponse) => void;
+  onMoodleVersionPolicySaved?: (minimumVersion: string) => void;
 }
 
 export function AdminSettingsModal({
@@ -38,6 +40,7 @@ export function AdminSettingsModal({
   onSaveLifecyclePolicy,
   currentUserEmail,
   onEmailSettingsSaved,
+  onMoodleVersionPolicySaved,
 }: AdminSettingsModalProps) {
   const [isAddPluginModalOpen, setIsAddPluginModalOpen] = useState(false);
   const [editingPlugin, setEditingPlugin] = useState<Plugin | null>(null);
@@ -70,6 +73,10 @@ export function AdminSettingsModal({
                 <Mail className="h-4 w-4" />
                 Email
               </TabsTrigger>
+              <TabsTrigger value="moodle-versions">
+                <Layers className="h-4 w-4" />
+                Moodle versions
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="plugins" className="mt-4 flex-1 min-h-0 overflow-y-auto pr-1">
@@ -94,6 +101,10 @@ export function AdminSettingsModal({
 
             <TabsContent value="email" className="mt-4 flex-1 overflow-y-auto pr-1">
               <EmailSettingsTab currentUserEmail={currentUserEmail} onSaved={onEmailSettingsSaved} />
+            </TabsContent>
+
+            <TabsContent value="moodle-versions" className="mt-4 flex-1 min-h-0 overflow-y-auto pr-1">
+              <MoodleVersionSettingsTab onSaved={onMoodleVersionPolicySaved} />
             </TabsContent>
           </Tabs>
         </DialogContent>

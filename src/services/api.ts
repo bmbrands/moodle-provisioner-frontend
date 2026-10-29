@@ -289,6 +289,46 @@ export interface MoodleVersion {
 
 interface ApiMoodleVersionsResponse {
   versions: MoodleVersion[];
+  minimum_version?: string;
+}
+
+// Administrator-set minimum Moodle version for new environments ("" = none).
+export interface MoodleVersionPolicy {
+  minimum_version: string;
+}
+
+export async function fetchMoodleVersionPolicy(): Promise<MoodleVersionPolicy> {
+  const response = await fetch("/api/moodle/policy");
+  if (!response.ok) {
+    throw new Error(`Failed to fetch Moodle version policy: ${response.status}`);
+  }
+  return response.json();
+}
+
+export async function updateMoodleVersionPolicy(
+  policy: MoodleVersionPolicy
+): Promise<MoodleVersionPolicy> {
+  const response = await fetch("/api/moodle/policy", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(policy),
+  });
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`Failed to save Moodle version policy: ${response.status} ${detail}`);
+  }
+  return response.json();
+}
+
+/** Compare two dotted version strings numerically ("4.5" == "4.5.0"). */
+export function compareMoodleVersions(a: string, b: string): number {
+  const pa = a.split(".").map(Number);
+  const pb = b.split(".").map(Number);
+  for (let i = 0; i < Math.max(pa.length, pb.length, 3); i++) {
+    const d = (pa[i] ?? 0) - (pb[i] ?? 0);
+    if (d !== 0) return d;
+  }
+  return 0;
 }
 
 export async function fetchMoodleVersions(): Promise<MoodleVersion[]> {
