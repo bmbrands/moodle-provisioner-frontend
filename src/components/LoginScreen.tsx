@@ -5,6 +5,7 @@ import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Alert, AlertDescription } from "./ui/alert";
+import { PrivacyLink } from "./PrivacyPage";
 
 interface LoginScreenProps {
   /** Authenticate with email + password. Should reject with an Error on failure. */
@@ -74,7 +75,7 @@ export function LoginScreen({
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
+    <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-muted/40 p-4">
       <Card className="w-full max-w-md">
         {mustChangePassword ? (
           <>
@@ -187,6 +188,7 @@ export function LoginScreen({
           </>
         )}
       </Card>
+      <PrivacyLink />
     </div>
   );
 }

@@ -1,10 +1,11 @@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./ui/dialog";
-import { Layers, Mail, Package, Settings, Timer } from "lucide-react";
+import { Layers, Mail, Package, Settings, ShieldCheck, Timer } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { LifecycleSettingsTab } from "./LifecycleSettingsTab";
 import { EmailSettingsTab } from "./EmailSettingsTab";
 import { MoodleVersionSettingsTab } from "./MoodleVersionSettingsTab";
-import type { EmailSettingsResponse, LifecyclePolicy } from "../services/api";
+import { PrivacySettingsTab } from "./PrivacySettingsTab";
+import type { EmailSettingsResponse, LifecyclePolicy, PrivacyPageData } from "../services/api";
 import { useState } from "react";
 import { PluginCatalogTable } from "./PluginCatalogTable";
 import { AddPluginModal } from "./AddPluginModal";
@@ -26,6 +27,7 @@ interface AdminSettingsModalProps {
   currentUserEmail?: string;
   onEmailSettingsSaved?: (settings: EmailSettingsResponse) => void;
   onMoodleVersionPolicySaved?: (minimumVersion: string) => void;
+  onPrivacyPageSaved?: (page: PrivacyPageData) => void;
 }
 
 export function AdminSettingsModal({
@@ -41,6 +43,7 @@ export function AdminSettingsModal({
   currentUserEmail,
   onEmailSettingsSaved,
   onMoodleVersionPolicySaved,
+  onPrivacyPageSaved,
 }: AdminSettingsModalProps) {
   const [isAddPluginModalOpen, setIsAddPluginModalOpen] = useState(false);
   const [editingPlugin, setEditingPlugin] = useState<Plugin | null>(null);
@@ -77,6 +80,10 @@ export function AdminSettingsModal({
                 <Layers className="h-4 w-4" />
                 Moodle versions
               </TabsTrigger>
+              <TabsTrigger value="privacy">
+                <ShieldCheck className="h-4 w-4" />
+                Privacy
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="plugins" className="mt-4 flex-1 min-h-0 overflow-y-auto pr-1">
@@ -105,6 +112,10 @@ export function AdminSettingsModal({
 
             <TabsContent value="moodle-versions" className="mt-4 flex-1 min-h-0 overflow-y-auto pr-1">
               <MoodleVersionSettingsTab onSaved={onMoodleVersionPolicySaved} />
+            </TabsContent>
+
+            <TabsContent value="privacy" className="mt-4 flex-1 min-h-0 overflow-y-auto pr-1">
+              <PrivacySettingsTab onSaved={onPrivacyPageSaved} />
             </TabsContent>
           </Tabs>
         </DialogContent>

@@ -11,6 +11,7 @@ import { EnvironmentFiltersComponent, applyEnvironmentFilters, defaultFilters } 
 import type { EnvironmentFilters } from "./components/EnvironmentFilters";
 import { Header } from "./components/Header";
 import { LoginScreen } from "./components/LoginScreen";
+import { PrivacyLink } from "./components/PrivacyPage";
 import { UserManagementModal } from "./components/UserManagementModal";
 import { useAuth } from "./hooks/useAuth";
 import { useAuditLog } from "./hooks/useAuditLog";
@@ -985,6 +986,19 @@ export default function App() {
             lifecyclePolicy={lifecyclePolicy}
             onSaveLifecyclePolicy={handleSaveLifecyclePolicy}
             currentUserEmail={auth.currentUser?.email}
+            onPrivacyPageSaved={() => {
+              if (!auth.currentUser) return;
+              auditLog.logActivity(
+                auth.currentUser.id,
+                `${auth.currentUser.firstName} ${auth.currentUser.lastName}`,
+                auth.currentUser.email,
+                'update',
+                'settings',
+                { section: 'privacy' },
+                'privacy',
+                'Data protection declaration'
+              );
+            }}
             onMoodleVersionPolicySaved={(minimumVersion) => {
               if (!auth.currentUser) return;
               auditLog.logActivity(
@@ -1046,6 +1060,9 @@ export default function App() {
           />
         )}
 
+        <footer className="mt-8 flex justify-center">
+          <PrivacyLink />
+        </footer>
       </div>
     </div>
   );

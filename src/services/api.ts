@@ -532,6 +532,36 @@ export const sendTestEmail = (to: string, settings: EmailSettingsForm) =>
 export const previewEmail = (subject: string, body: string) =>
   emailRequest<{ subject: string; body: string }>("/preview", "POST", { subject, body });
 
+// ---- Data protection declaration ---------------------------------------
+
+export interface PrivacyPageData {
+  html: string; // sanitized by the backend
+  updated_at: string;
+  updated_by: string;
+}
+
+/** Public: works without a session (used by the /privacy page). */
+export async function fetchPrivacyPage(): Promise<PrivacyPageData> {
+  const response = await fetch("/api/privacy");
+  if (!response.ok) {
+    throw new Error(`Failed to load the data protection declaration: ${response.status}`);
+  }
+  return response.json();
+}
+
+export async function updatePrivacyPage(html: string): Promise<PrivacyPageData> {
+  const response = await fetch("/api/privacy", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ html }),
+  });
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`Failed to save the data protection declaration: ${response.status} ${detail}`);
+  }
+  return response.json();
+}
+
 // ---- Settings ----------------------------------------------------------
 
 export type SettingValue = string | number | boolean;
