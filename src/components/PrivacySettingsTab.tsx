@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { fetchPrivacyPage, updatePrivacyPage } from "../services/api";
+import { PRIVACY_URL } from "./PrivacyPage";
 import type { PrivacyPageData } from "../services/api";
 
 interface PrivacySettingsTabProps {
@@ -93,12 +94,12 @@ export function PrivacySettingsTab({ onSaved }: PrivacySettingsTabProps) {
         <div>
           <h3 className="font-medium">Data protection declaration</h3>
           <p className="text-sm text-muted-foreground">
-            Shown on the public page <code>/privacy</code>, linked below the login form and at the bottom of the
+            Shown on the public page <code>{PRIVACY_URL}</code>, linked below the login form and at the bottom of the
             application. Only headings, paragraphs, bold, italic, underline, lists and links are kept.
           </p>
         </div>
         <a
-          href="/privacy"
+          href={PRIVACY_URL}
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex flex-shrink-0 items-center gap-1 text-sm text-primary hover:underline"

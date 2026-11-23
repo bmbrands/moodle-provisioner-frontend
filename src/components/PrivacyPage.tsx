@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { fetchPrivacyPage } from "../services/api";
 import type { PrivacyPageData } from "../services/api";
 
-/** Public page at /privacy; readable without signing in. */
+/** Public page at /?privacy; readable without signing in. */
 export function PrivacyPage() {
   const [page, setPage] = useState<PrivacyPageData | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -54,10 +54,13 @@ export function PrivacyPage() {
   );
 }
 
+/** Address of the declaration; a query string needs no server configuration. */
+export const PRIVACY_URL = "/?privacy";
+
 /** Small link to the declaration, used below the login form and the app. */
 export function PrivacyLink() {
   return (
-    <a href="/privacy" className="text-xs text-muted-foreground hover:text-foreground hover:underline">
+    <a href={PRIVACY_URL} className="text-xs text-muted-foreground hover:text-foreground hover:underline">
       Data protection declaration
     </a>
   );
